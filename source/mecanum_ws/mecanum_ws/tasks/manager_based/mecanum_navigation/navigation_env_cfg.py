@@ -268,44 +268,45 @@ class RewardsCfg:
         weight=0.5,
         params={"command_name": "goal_pose", "reward_duration": TASK_REWARD_DURATION, "threshold": 0.5, "std": 1.0},
     )
-    # ---- penalties: switched off for now (only the task reward and the exploration bias). Hitting a pillar or
-    # flipping over still terminates the episode (TerminationsCfg), which forfeits the task reward.
-    # Uncomment to re-enable (tune_rewards.py trials that override these weights need them enabled).
-    # stalling, eq. (4): standing still (< 0.1 m/s) farther than 0.5 m from the goal
-    # stalling = RewTerm(func=mdp.stalling, weight=-0.5, params={"command_name": "goal_pose"})
-    # penalties, the wheeled counterparts of eq. (2)
-    # -- joint torques -> wheel motor torques (energy / heat proxy)
-    # wheel_torque_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-2.0e-4, params={"asset_cfg": WHEELS})
-    # -- joint accelerations -> wheel accelerations
-    # wheel_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-1.0e-6, params={"asset_cfg": WHEELS})
-    # -- feet accelerations (impacts) -> wheel slip on the rollers
-    # wheel_slip_l2 = RewTerm(
-        # func=mdp.wheel_slip_l2,
-        # weight=-0.5,
-        # params={
-            # "asset_cfg": WHEELS,
-            # "wheel_radius": mecanum.WHEEL_RADIUS,
-            # "wheel_base_half_length": mecanum.WHEEL_BASE_HALF_LENGTH,
-            # "track_half_width": mecanum.TRACK_HALF_WIDTH,
-            # "wheel_joint_signs": mecanum.WHEEL_JOINT_SIGNS,
-        # },
-    # )
-    # -- abrupt action changes
-    # action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
-    # -- collisions: close to a pillar, hitting one (terminates, so the task reward is lost too) or flipping over
-    #obstacle_proximity = RewTerm(
-    #   func=mdp.obstacle_proximity,
-    #    weight=-1.0,
-    #    params={
-    #        "sensor_cfg": LIDAR_SENSOR,
-    #        "max_distance": LIDAR_MAX_DISTANCE,
-    #        "half_extents": mecanum.FOOTPRINT_HALF_EXTENTS,
-    #        "safe_clearance": 0.25,
-    #    },
-    #)
-    # collision = RewTerm(func=mdp.is_terminated_term, weight=-100.0, params={"term_keys": ["collision", "flipped"]})
-    # -- chassis tilting (roll / pitch rates)
-    # ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
+    # ---- penalties: all off (weight 0 -> skipped by the reward manager). scripts/tools/staged_penalties.py switches
+    # them on one at a time via Hydra (env.rewards.<term>.weight=...). Hitting a pillar or flipping over terminates the
+    # episode (TerminationsCfg), which forfeits the task reward. "was": weight used before the penalties were removed.
+    # -- joint torques (Rudin eq. 2) -> wheel motor torques; motor heat E_e ~ tau^2 (Xie et al. 2020); was -2e-4
+    wheel_torque_l2 = RewTerm(func=mdp.joint_torques_l2, weight=0.0, params={"asset_cfg": WHEELS})
+    # -- abrupt action changes (Rudin eq. 2; Finke et al. 2026); was -0.01
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=0.0)
+    # -- joint accelerations (Rudin eq. 2) -> wheel accelerations; kinetic energy changes E_k (Xie); was -1e-6
+    wheel_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=0.0, params={"asset_cfg": WHEELS})
+    # -- stalling (Rudin eq. 4): < 0.1 m/s farther than 0.5 m from the goal; ~ idle energy E_idle (Xie); was -0.5
+    stalling = RewTerm(func=mdp.stalling, weight=0.0, params={"command_name": "goal_pose"})
+    # -- wheel slip on the rollers; friction dissipation E_f (Xie); stands in for the feet accelerations; was -0.5
+    wheel_slip_l2 = RewTerm(
+        func=mdp.wheel_slip_l2,
+        weight=0.0,
+        params={
+            "asset_cfg": WHEELS,
+            "wheel_radius": mecanum.WHEEL_RADIUS,
+            "wheel_base_half_length": mecanum.WHEEL_BASE_HALF_LENGTH,
+            "track_half_width": mecanum.TRACK_HALF_WIDTH,
+            "wheel_joint_signs": mecanum.WHEEL_JOINT_SIGNS,
+        },
+    )
+    # -- action magnitude (Finke et al. 2026: -0.05)
+    action_l2 = RewTerm(func=mdp.action_l2, weight=0.0)
+    # -- obstacles (pillar terrain): proximity (not in the papers; was -1.0) and collision (Rudin eq. 2; was -100)
+    obstacle_proximity = RewTerm(
+        func=mdp.obstacle_proximity,
+        weight=0.0,
+        params={
+            "sensor_cfg": LIDAR_SENSOR,
+            "max_distance": LIDAR_MAX_DISTANCE,
+            "half_extents": mecanum.FOOTPRINT_HALF_EXTENTS,
+            "safe_clearance": 0.25,
+        },
+    )
+    collision = RewTerm(func=mdp.is_terminated_term, weight=0.0, params={"term_keys": ["collision", "flipped"]})
+    # -- chassis roll / pitch rates (not in the papers); was -0.05
+    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=0.0)
 
 
 @configclass

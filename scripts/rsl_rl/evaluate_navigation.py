@@ -95,6 +95,12 @@ def main():
     episodes = []
     done_count = torch.zeros(n, dtype=torch.long, device=dev)
     max_len = u.max_episode_length
+    # motion quality over all evaluated steps: the quantities the penalties act on (for the staged penalty study)
+    wheels = mdp.SceneEntityCfg("robot", joint_names=mecanum.WHEEL_JOINT_NAMES, preserve_order=True)
+    wheels.resolve(u.scene)
+    motion = {k: 0.0 for k in ("torque2", "acc2", "action_rate2", "action2", "slip2", "stall", "steps")}
+    spin_sum, spin_count = 0.0, 0.0
+    prev_actions = torch.zeros(n, 4, device=dev)
 
     obs = env.get_observations()
     with torch.inference_mode():
@@ -108,7 +114,24 @@ def main():
                 u, mdp.SceneEntityCfg("lidar"), 5.0, mecanum.FOOTPRINT_HALF_EXTENTS
             ).clone()
             actions = policy(obs)
+            counting = (done_count < args_cli.episodes).float()
             obs, _, dones, _ = env.step(actions)
+            # motion quality of this step (per env, summed over the wheels)
+            torque2 = torch.sum(robot.data.applied_torque[:, wheels.joint_ids] ** 2, dim=1)
+            acc2 = torch.sum(robot.data.joint_acc[:, wheels.joint_ids] ** 2, dim=1)
+            slip2 = mdp.wheel_slip_l2(
+                u, wheels, mecanum.WHEEL_RADIUS, mecanum.WHEEL_BASE_HALF_LENGTH, mecanum.TRACK_HALF_WIDTH,
+                mecanum.WHEEL_JOINT_SIGNS,
+            )
+            for key, value in (
+                ("torque2", torque2),
+                ("acc2", acc2),
+                ("action_rate2", torch.sum((actions - prev_actions) ** 2, dim=1)),
+                ("action2", torch.sum(actions**2, dim=1)),
+                ("slip2", slip2),
+            ):
+                motion[key] += float(torch.sum(value * counting))
+            motion["steps"] += float(counting.sum())
             # quantities of the step that just happened (pose not yet reset for done envs is lost, so use terms)
             pos = robot.data.root_pos_w[:, :2]
             speed = torch.linalg.norm(robot.data.root_lin_vel_w[:, :2], dim=1)
@@ -123,6 +146,12 @@ def main():
             dist_now = mdp.goal_distance(u, "goal_pose")
             arrived = (dist_now < SUCCESS_RADIUS) & torch.isnan(arrival_step) & ~done
             arrival_step = torch.where(arrived, ep_steps, arrival_step)
+            # spinning at the goal, stalling far from it
+            at_goal = (dist_now < 0.3) & (ep_steps > 50) & ~done & (counting > 0)
+            spin_sum += float(robot.data.root_ang_vel_b[at_goal, 2].abs().sum())
+            spin_count += float(at_goal.sum())
+            motion["stall"] += float((((speed < 0.1) & (dist_now > 0.5) & ~done).float() * counting).sum())
+            prev_actions = torch.where(done.unsqueeze(1), torch.zeros_like(actions), actions)
 
             if done.any():
                 tm = u.termination_manager
@@ -161,7 +190,11 @@ def main():
                 bin_count[done] = 0.0
             prev_pos = robot.data.root_pos_w[:, :2].clone()
 
-    report(episodes, u.step_dt * max_len)
+    steps = max(motion.pop("steps"), 1.0)
+    motion = {k: v / steps for k, v in motion.items()}
+    motion["stall_frac"] = motion.pop("stall")
+    motion["spin_at_goal"] = spin_sum / max(spin_count, 1.0)
+    report(episodes, u.step_dt * max_len, motion)
     # Kit's shutdown can hang after long runs; the results are written, so exit hard
     sys.stdout.flush()
     os._exit(0)
@@ -188,7 +221,7 @@ def apply_overrides(env_cfg, overrides: list[str]):
         print(f"[INFO] override env.{'.'.join(path + [leaf])} = {value!r}")
 
 
-def report(episodes: list[dict], episode_s: float):
+def report(episodes: list[dict], episode_s: float, motion: dict):
     e = episodes
     arr = lambda k: np.array([x[k] for x in e], dtype=float)  # noqa: E731
     succ, coll, lvl = arr("success"), arr("collided"), arr("level")
@@ -221,10 +254,14 @@ def report(episodes: list[dict], episode_s: float):
         print(f"   gap between pillar and the robot's rectangle at termination: median {np.median(clr):.2f} m, "
               f"{(clr > 0.05).mean():.0%} of the crashes had > 5 cm real clearance")
         print(f"   crash time: median {np.median(t):.1f} s")
+    print("\nmotion quality (mean per policy step): " + ", ".join(
+        f"{k} {v:.4g}" for k, v in motion.items()
+    ) + "  [torque2: sum tau^2 Nm^2, acc2: sum qdd^2, action_rate2 / action2: raw actions, slip2: m^2/s^2, "
+        "stall_frac: slow (< 0.1 m/s) > 0.5 m from the goal, spin_at_goal: |yaw rate| rad/s within 0.3 m]")
     out = os.path.join(os.path.dirname(os.path.abspath(args_cli.checkpoint)),
                        f"eval_{os.path.splitext(os.path.basename(args_cli.checkpoint))[0]}.json")
     with open(out, "w") as f:
-        json.dump({"episodes": e, "success": float(succ.mean()), "crashed": float(coll.mean())}, f)
+        json.dump({"episodes": e, "success": float(succ.mean()), "crashed": float(coll.mean()), "motion": motion}, f)
     print(f"\n[INFO] Wrote {out}")
 
 

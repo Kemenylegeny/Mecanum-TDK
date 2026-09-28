@@ -199,6 +199,23 @@ python scripts/tools/tune_rewards.py --study round1 --report          # csak a r
 - `--wandb`: group = study neve, a kiértékelés `eval/*` összesítőként és `study:`/`early_stopped` tagként a runhoz
   kerül; előtte `export WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem`.
 
+## Büntetések lépésenkénti visszakapcsolása (sík terep)
+
+```bash
+WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem setsid nohup \
+  /home/bence.farkas@egroup.hu/miniconda3/envs/env_isaaclab/bin/python -u scripts/tools/staged_penalties.py \
+  --study flat_penalties --wandb --video > logs/staged/flat_penalties_study.log 2>&1 < /dev/null &
+```
+
+Kiindulás: a csak pozitív jutalommal (`final_position` + `exploration_bias`) tanított sík terepes policy
+(`*flat_task_and_bias/model_499.pt`). A szkript megvárja ennek a végét, kiértékeli (kapu: ≥ 85% siker), majd
+sorban egyenként bekapcsolja a büntetéseket: `wheel_torque_l2` → `action_rate_l2` → `wheel_acc_l2` → `stalling` →
+`wheel_slip_l2` → `action_l2`. Minden lépésben az előzőleg elfogadott policyből folytat (`--resume`, 150 iteráció),
+a súlyokat a legerősebbtől a leggyengébbig próbálja, és az első olyat fogadja el, amelynél a siker legfeljebb 3
+százalékponttal, az odaérési idő legfeljebb 1 s-mal romlik. Ha egy lépés egyik súlya sem felel meg, megáll. Eredmény:
+`logs/staged/<study>/report.md` (a hatás-metrikákkal: nyomaték², akcióváltás², gyorsulás², csúszás², pörgés a célban).
+A büntetések a konfigban 0 súllyal szerepelnek (a reward manager kihagyja őket), a szkript Hydra-override-dal kapcsolja be.
+
 ## Videó a tanításról
 
 A `--video` kapcsoló headless módban is működik (automatikusan bekapcsolja a kamerákat). A kamera az
