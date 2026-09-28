@@ -407,8 +407,8 @@ class MecanumNavigationPillarsEnvCfg(ManagerBasedRLEnvCfg):
         # overflow warning); raise gpu_max_rigid_patch_count etc. only if PhysX reports an overflow (costs GPU memory)
         # sensor update rate = policy rate
         self.scene.lidar.update_period = self.decimation * self.sim.dt
-        # viewer / video camera: all curriculum levels in view (follow_camera(self) follows the robot of env 1)
-        overview_camera(self)
+        # viewer / video camera: follows the robot of env 1 (overview_camera(self): all curriculum levels in view)
+        follow_camera(self)
 
 
 @configclass
@@ -425,7 +425,6 @@ class MecanumNavigationPillarsEnvCfg_PLAY(MecanumNavigationPillarsEnvCfg):
         self.curriculum.terrain_levels = None
         self.observations.policy.enable_corruption = False
         self.events.physics_material = None
-        overview_camera(self)
 
 
 @configclass
@@ -438,3 +437,30 @@ class MecanumNavigationPillarsIkEnvCfg(MecanumNavigationPillarsEnvCfg):
 @configclass
 class MecanumNavigationPillarsIkEnvCfg_PLAY(MecanumNavigationPillarsEnvCfg_PLAY):
     actions: IkActionsCfg = IkActionsCfg()
+
+
+@configclass
+class MecanumNavigationFlatEnvCfg(MecanumNavigationPillarsEnvCfg):
+    """Same navigation task on flat ground: the terrain tiles have no pillars (the lidar sees nothing), so there is no
+    curriculum either. A first step before learning to avoid obstacles."""
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        pillars = self.scene.terrain.terrain_generator.sub_terrains["pillars"]
+        pillars.object_params_start.num_objects = 0
+        pillars.object_params_end.num_objects = 0
+        # all tiles are identical: spread the robots over all of them and keep them there
+        self.scene.terrain.terrain_generator.curriculum = False
+        self.scene.terrain.max_init_terrain_level = None
+        self.curriculum.terrain_levels = None
+
+
+@configclass
+class MecanumNavigationFlatEnvCfg_PLAY(MecanumNavigationFlatEnvCfg):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.scene.num_envs = 32
+        self.scene.terrain.terrain_generator.num_rows = 5
+        self.scene.terrain.terrain_generator.num_cols = 5
+        self.observations.policy.enable_corruption = False
+        self.events.physics_material = None

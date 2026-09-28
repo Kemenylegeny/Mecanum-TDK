@@ -42,3 +42,13 @@ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class PPORunnerIkCfg(PPORunnerCfg):
     experiment_name = "mecanum_navigation_pillars_ik"
+
+
+@configclass
+class PPORunnerFlatCfg(PPORunnerCfg):
+    experiment_name = "mecanum_navigation_flat"
+    # no entropy bonus: with only the task reward and the exploration bias (no action / motion penalties) nothing
+    # counteracts it, and since the wheel commands are clipped, a wider action distribution costs almost no reward.
+    # With entropy_coef = 0.005 the action std grew from 0.5 to 4.3 (Loss/entropy 2.9 -> 11.5) in 500 iterations and
+    # the sampled wheel commands became random full-speed bang-bang (robots jittering in place during training).
+    algorithm = PPORunnerCfg().algorithm.replace(entropy_coef=0.0)
