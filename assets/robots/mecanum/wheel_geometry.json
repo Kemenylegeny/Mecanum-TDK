@@ -1,0 +1,45 @@
+{
+  "wheel": {
+    "num_rollers": 14,
+    "roller_angle_deg": 45.0,
+    "roller_center_radius": 0.0895,
+    "roller_mid_radius": 0.013,
+    "roller_half_length": 0.03,
+    "spheres_per_roller": 6,
+    "roller_mass": 0.03,
+    "roller_damping": 1e-05,
+    "hub_radius": 0.075,
+    "hub_width": 0.0644,
+    "hub_mass": 1.0
+  },
+  "robot": {
+    "chassis_size": [
+      0.6,
+      0.4,
+      0.12
+    ],
+    "chassis_mass": 18.0,
+    "wheel_x": 0.22,
+    "wheel_y": 0.26,
+    "wheel_z": -0.02,
+    "axle_mass": 1.0,
+    "axle_swing": 0.12
+  },
+  "num_links": 62,
+  "envelope": {
+    "envelope_radius": 0.1025,
+    "min_effective_radius": 0.1023994977692647,
+    "max_effective_radius": 0.10249999999893504,
+    "ripple_peak_to_peak_mm": 0.10050222967034061,
+    "roller_handovers_per_pitch": 3,
+    "coverage_ok": true,
+    "sphere_radii_mm": [
+      10.52,
+      12.1,
+      12.9,
+      12.9,
+      12.1,
+      10.52
+    ]
+  }
+}
