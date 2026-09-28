@@ -48,3 +48,14 @@ A végső policy mozgása (`scripts/tools/motion_diagnostics.py`, 64 epizód, c�
   az egyenesnél, néha nagy kerülővel;
 - a célban forog (0,5 rad/s), a kerekek átlagosan 2,3 rad/s-mal forognak, miközben a robot áll (csúszás);
 - a kerékparancsok remegnek: kerekenként ~24 irányváltás másodpercenként.
+
+## Büntetések egyenként, nulláról tanítva, 7 s epizód (study `flat7s`)
+
+`scripts/tools/penalty_study.py --study flat7s`: minden policy nulláról, 400 iteráció, 3072 env.
+Súly: `w = −f · 10 / (m_ref · 7 s)`, ahol `m_ref` a büntetett mennyiség lépésenkénti
+átlaga az előző elfogadott policynél (így a büntetés a fő jutalom `f`-szeresét vonná le). Elfogadás: a siker / ütközés /
+odaérés nem romlik, és a célzott metrika legalább 20%-kal csökken.
+
+| Dátum | Run (wandb) | Lépés / próba | Új büntetés, súly (f) | Siker | Ütközés | Odaérés [s] | Célzott metrika: ref → új | Döntés |
+|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 01:45 | [stage0_base](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/qrdfm9um) | 0 / 0 | – (csak pozitív jutalom) | 100.0% | 0.0% | 3.0 | – | accepted (gate) |
