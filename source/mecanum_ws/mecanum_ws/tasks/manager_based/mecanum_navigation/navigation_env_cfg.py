@@ -48,6 +48,10 @@ EPISODE_LENGTH_S = 12.0
 TASK_REWARD_DURATION = 2.0
 """Duration ``T_r`` of the final-position task reward at the end of the episode [s]."""
 
+FLAT_EPISODE_LENGTH_S = 7.0
+"""Episode length on flat ground [s]: short enough that the robot has to drive to the goal instead of creeping (with
+12 s it arrived after ~5.6 s and waited; the task reward window is the last ``TASK_REWARD_DURATION`` seconds)."""
+
 ##
 # Scene definition
 ##
@@ -450,6 +454,7 @@ class MecanumNavigationFlatEnvCfg(MecanumNavigationPillarsEnvCfg):
         pillars = self.scene.terrain.terrain_generator.sub_terrains["pillars"]
         pillars.object_params_start.num_objects = 0
         pillars.object_params_end.num_objects = 0
+        self.episode_length_s = FLAT_EPISODE_LENGTH_S
         # all tiles are identical: spread the robots over all of them and keep them there
         self.scene.terrain.terrain_generator.curriculum = False
         self.scene.terrain.max_init_terrain_level = None
