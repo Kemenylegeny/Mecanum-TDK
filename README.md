@@ -216,6 +216,22 @@ százalékponttal, az odaérési idő legfeljebb 1 s-mal romlik. Ha egy lépés 
 `logs/staged/<study>/report.md` (a hatás-metrikákkal: nyomaték², akcióváltás², gyorsulás², csúszás², pörgés a célban).
 A büntetések a konfigban 0 súllyal szerepelnek (a reward manager kihagyja őket), a szkript Hydra-override-dal kapcsolja be.
 
+## Büntetések egyenként, nulláról tanítva (kalibrált súlyokkal)
+
+```bash
+WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem setsid nohup \
+  /home/bence.farkas@egroup.hu/miniconda3/envs/env_isaaclab/bin/python -u scripts/tools/penalty_study.py \
+  --study flat7s --wandb --video --git > logs/penalty_study/flat7s_study.log 2>&1 < /dev/null &
+```
+
+A 0. lépés a sík terepes feladatot (7 s epizód) csak pozitív jutalommal tanítja; minden további lépés hozzávesz egy
+büntetést (sorrend: nyomaték → akcióváltás → kerékgyorsulás → stalling → csúszás → akció-nagyság), és **nulláról**
+tanít (400 iteráció). A súly kalibrált: `w = −f · 10 / (m_ref · 7 s)`, ahol `m_ref` a büntetett mennyiség
+lépésenkénti átlaga az előző elfogadott policynél, vagyis a büntetés a fő jutalom maximumának `f`-szeresét vonná le
+(kezdetben f = 20%). Ha a siker / odaérés romlik, gyengít; ha a célzott metrika nem csökken legalább 20%-kal, erősít
+(legfeljebb 4 próba lépésenként). Minden run bekerül az `EXPERIMENTS.md`-be, és dátummal commitolódik / pusholódik.
+Riport: `logs/penalty_study/<study>/report.md`.
+
 ## Videó a tanításról
 
 A `--video` kapcsoló headless módban is működik (automatikusan bekapcsolja a kamerákat). A kamera az
