@@ -103,3 +103,9 @@ a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterác
 | Dátum | Run (wandb) | `final_position` súly | Siker | Ütközés | Elindul: legrosszabb szint / összes | Elindul szintenként | Siker szintenként | Curriculum-szint (tanítás) | Akció std | Task reward arány (bias) | Döntés |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-09-29 18:54 | [goalw_10](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/0r2jwu2a) | 10 | 41.9% | 14.5% | 83% / 93% | 0:98% 1:98% 2:97% 3:97% 4:97% 5:91% 6:92% 7:90% 8:85% 9:83% | 0:78% 1:71% 2:56% 3:52% 4:42% 5:31% 6:29% 7:19% 8:21% 9:19% | 5.78 | 0.01 | 0.50 (ki) | elindul minden szinten -> emelés leáll |
+
+## Egyedi tanítások (`scripts/tools/train_eval_log.py`)
+
+| Dátum | Run (wandb) | Feladat | Beállítás (Hydra override) | Siker | Ütközés | Siker (7–9. szint) | Odaérés [s] | Végső curriculum-szint | Mozgás | Megjegyzés |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 23:13 | [pillars7s_goalw10_cont800](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/l11o043d) | `Mecanum-Navigation-Pillars-v0` | `env.episode_length_s=7.0` `env.rewards.final_position.weight=10.0` `env.rewards.wheel_torque_l2.weight=-0.00312` `env.rewards.action_rate_l2.weight=-18.0` `agent.algorithm.entropy_coef=0.0` | 38.7% | 13.6% | 21.2% | 5.1 | 6.3098 | sebesség 0.59 m/s, előre 43%, pörgés a célban 1.15 rad/s | goalw_10 (pillars7s_goalw_v2) folytatása model_399-ből +400 iterációval, ugyanazokkal a súlyokkal |
