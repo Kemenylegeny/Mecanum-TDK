@@ -90,3 +90,16 @@ Ok: a curriculum a 0–2. szinten indít, így ~50 robot jut egy csempére (a fl
 patch-igénye (~370k) túllépi az alapértéket (163 840). A kiértékelés / diagnosztika kevés envvel futott, ott nincs
 overflow (ott a policy el is indul). Javítás: `sim.physx.gpu_max_rigid_patch_count = 2**19`. A sweep új study-ként
 (`pillars7s_goalw_v2`) újraindul, a 10-es súlyt is újratanítva.
+
+## Célreward (`final_position`) súlyának emelése, oszlopok + curriculum (study `pillars7s_goalw_v2`)
+
+`scripts/tools/goal_weight_sweep.py --study pillars7s_goalw_v2`: az oszlopos feladat curriculummal, a flat7s-ben elfogadott
+büntetésekkel (`episode_length_s = 7`, `wheel_torque_l2 = -0.00312`, `action_rate_l2 = -18`, `entropy_coef = 0`).
+Az 1. próba súlya 10. A súly próbánként 2-szeresére nő, minden próba nulláról tanít (400 iteráció, 3072 env). Egy epizód akkor
+„indul el a cél felé”, ha az első 2 s alatt legalább 0.5 m-rel közelebb kerül a célhoz; a súly emelése leáll, ha ez
+**minden** szinten az epizódok legalább 80%-ára teljesül. Kiértékelés: determinisztikus policy, mind
+a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterációjából.
+
+| Dátum | Run (wandb) | `final_position` súly | Siker | Ütközés | Elindul: legrosszabb szint / összes | Elindul szintenként | Siker szintenként | Curriculum-szint (tanítás) | Akció std | Task reward arány (bias) | Döntés |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 17:02 | goalw_10 | 10 | | | | | | | | | | tanítás fut |
