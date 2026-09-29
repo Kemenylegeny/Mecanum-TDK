@@ -251,16 +251,15 @@ az `EXPERIMENTS.md`-ben (commit + push `--git` esetén).
 ```bash
 WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem setsid nohup \
   /home/bence.farkas@egroup.hu/miniconda3/envs/env_isaaclab/bin/python -u scripts/tools/goal_weight_sweep.py \
-  --wandb --video --git \
-  --baseline_checkpoint logs/rsl_rl/mecanum_navigation_pillars/2026-09-29_15-11-39_pillars7s_torque_actionrate/model_200.pt \
-  --baseline_train_log logs/runs/pillars7s_torque_actionrate/train.log \
-  > logs/goal_sweep/pillars7s_goalw.log 2>&1 < /dev/null &
+  --study pillars7s_goalw_v2 --wandb --video --git > logs/goal_sweep/pillars7s_goalw_v2.log 2>&1 < /dev/null &
 ```
 
 A büntetések rögzítettek (flat7s: nyomaték, akcióváltás; 7 s; entropy 0). A `final_position` súlya próbánként
-duplázódik (10 → 20 → 40 → …, legfeljebb 5 tanítás, mind nulláról, 400 iteráció). Egy epizód „elindul a cél felé”, ha
+duplázódik (10 → 20 → 40 → …, legfeljebb 5 tanítás, mind nulláról, 400 iteráció; `--baseline_checkpoint`-tal
+egy meglévő policy lehet a 0. próba). Egy epizód „elindul a cél felé”, ha
 az első 2 s-ban ≥ 0.5 m-rel közelebb kerül a célhoz (`evaluate_navigation.py` szintenkénti táblája); az emelés leáll,
-ha ez minden szinten az epizódok ≥ 80%-ára igaz. Minden súlyváltás (indításkor és eredménnyel) bekerül az
+ha ez minden szinten az epizódok ≥ 80%-ára igaz. A tábla a szintenkénti sikert és a tanítási log PhysX-overflow
+hibáinak számát is mutatja. Minden súlyváltás (indításkor és eredménnyel) bekerül az
 `EXPERIMENTS.md`-be, commit + push. Rekordok: `logs/goal_sweep/<study>/records.json`.
 
 ## Videó a tanításról

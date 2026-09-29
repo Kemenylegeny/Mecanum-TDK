@@ -6,8 +6,8 @@
 """Raise the task reward (``final_position`` weight) until the policy heads for the goal on every curriculum level.
 
 Pillar task with the curriculum, penalties fixed (``BASE_OVERRIDES``). Attempt 0 evaluates an existing checkpoint
-trained with the current weight (``--baseline_checkpoint``); every further attempt multiplies the weight by
-``--factor`` and trains from scratch. Each policy is evaluated on all levels (``evaluate_navigation.py``): an episode
+trained with the current weight (``--baseline_checkpoint``, optional; without it attempt 1 trains the start weight);
+every further attempt multiplies the weight by ``--factor`` and trains from scratch. Each policy is evaluated on all levels (``evaluate_navigation.py``): an episode
 "started towards the goal" if the goal distance dropped by >= 0.5 m within the first 2 s. The sweep stops at the first
 weight where this holds for at least ``--min_started`` of the episodes on every level.
 
@@ -57,7 +57,7 @@ def parse_args():
     parser.add_argument("--study", default="pillars7s_goalw")
     parser.add_argument("--start_weight", type=float, default=10.0, help="Weight of the baseline (attempt 0).")
     parser.add_argument("--factor", type=float, default=2.0, help="Weight multiplier per attempt.")
-    parser.add_argument("--max_attempts", type=int, default=5, help="Trainings (weights 20, 40, ... 320 by default).")
+    parser.add_argument("--max_attempts", type=int, default=5, help="Trainings (weights 10, 20, ... 160 without a baseline checkpoint).")
     parser.add_argument("--min_started", type=float, default=0.8, help="Share of episodes per level that must start.")
     parser.add_argument("--baseline_checkpoint", default=None, help="Checkpoint trained with --start_weight.")
     parser.add_argument("--baseline_train_log", default=None, help="Its training log (for the training metrics).")
@@ -83,7 +83,7 @@ def train_metrics(train_log: str | None) -> dict:
         blocks = re.split(r"Learning iteration (\d+)/\d+", f.read())
     if len(blocks) < 3:
         return {}
-    out = {"iterations": int(blocks[-2]) + 1}
+    out = {"iterations": int(blocks[-2]) + 1, "physx_overflow": sum(len(re.findall("buffer overflow", b)) for b in blocks)}
     for key, label in TRAIN_METRICS.items():
         m = re.search(re.escape(label) + r":\s*(-?[\d.]+(?:e-?\d+)?)", blocks[-1])
         if m:
@@ -110,6 +110,9 @@ def evaluate(args, study_dir: str, name: str, checkpoint: str, weight: float) ->
         eps = [e for e in episodes if e["level"] == L]
         per_level[L] = sum(e["early_progress"] >= 0.5 for e in eps) / len(eps)
     result["started_per_level"] = per_level
+    result["success_per_level"] = {
+        L: sum(e["success"] for e in episodes if e["level"] == L) / sum(e["level"] == L for e in episodes) for L in per_level
+    }
     result["started_min"] = min(per_level.values())
     result["started_mean"] = sum(e["early_progress"] >= 0.5 for e in episodes) / len(episodes)
     return result
@@ -164,32 +167,40 @@ def render_row(rec: dict) -> str:
     name = f"[{rec['name']}]({rec['url']})" if rec.get("url") else rec["name"]
     head = f"| {rec['date']} | {name} | {rec['weight']:g} |"
     if rec["status"] == "running":
-        return head + " | | | | | | | | tanítás fut |"
+        return head + " | | | | | | | | | tanítás fut |"
     if rec["status"] == "error":
-        return head + f" | | | | | | | | hiba: {rec['error']} |"
+        return head + f" | | | | | | | | | hiba: {rec['error']} |"
     t = rec.get("train", {})
-    levels = " ".join(f"{int(L)}:{v:.0%}" for L, v in sorted(rec["started_per_level"].items(), key=lambda x: int(x[0])))
+
+    def per_level(key):
+        if key not in rec:
+            return "–"
+        return " ".join(f"{int(L)}:{v:.0%}" for L, v in sorted(rec[key].items(), key=lambda x: int(x[0])))
+
+    overflow = f" **PhysX overflow: {t['physx_overflow']}×**" if t.get("physx_overflow") else ""
     return (f"{head} {rec['success']:.1%} | {rec['crashed']:.1%} | {rec['started_min']:.0%} / {rec['started_mean']:.0%} "
-            f"| {levels} | {t.get('level', float('nan')):.2f} | {t.get('action_std', float('nan')):.2f} "
-            f"| {t.get('task_fraction', float('nan')):.2f} ({'be' if t.get('bias_active', 1) else 'ki'}) | {rec['decision']} |")  # fmt: skip
+            f"| {per_level('started_per_level')} | {per_level('success_per_level')} "
+            f"| {t.get('level', float('nan')):.2f} | {t.get('action_std', float('nan')):.2f} "
+            f"| {t.get('task_fraction', float('nan')):.2f} ({'be' if t.get('bias_active', 1) else 'ki'}) | {rec['decision']}{overflow} |")  # fmt: skip
 
 
 def write_experiments(args, records: list[dict], message: str):
     """(Re)write this sweep's section of EXPERIMENTS.md from the records, then commit + push."""
     path = os.path.join(ROOT, "EXPERIMENTS.md")
     header = f"## Célreward (`final_position`) súlyának emelése, oszlopok + curriculum (study `{args.study}`)"
+    baseline = (f"A 0. próba egy meglévő checkpoint (`{os.path.relpath(args.baseline_checkpoint, ROOT)}`, súly {args.start_weight:g}). "
+                if args.baseline_checkpoint else f"Az 1. próba súlya {args.start_weight:g}. ")  # fmt: skip
     intro = f"""{header}
 
 `scripts/tools/goal_weight_sweep.py --study {args.study}`: az oszlopos feladat curriculummal, a flat7s-ben elfogadott
 büntetésekkel ({", ".join(f"`{k.split('.')[-2] if 'rewards' in k else k.split('.')[-1]} = {v:g}`" for k, v in BASE_OVERRIDES.items())}).
-A 0. próba a leállított `pillars7s_torque_actionrate` run (súly {args.start_weight:g}); utána minden próba a súlyt
-{args.factor:g}-szeresére emeli, és nulláról tanít ({args.iterations} iteráció, {args.num_envs} env). Egy epizód akkor
+{baseline}A súly próbánként {args.factor:g}-szeresére nő, minden próba nulláról tanít ({args.iterations} iteráció, {args.num_envs} env). Egy epizód akkor
 „indul el a cél felé”, ha az első 2 s alatt legalább 0.5 m-rel közelebb kerül a célhoz; a súly emelése leáll, ha ez
 **minden** szinten az epizódok legalább {args.min_started:.0%}-ára teljesül. Kiértékelés: determinisztikus policy, mind
 a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterációjából.
 
-| Dátum | Run (wandb) | `final_position` súly | Siker | Ütközés | Elindul: legrosszabb szint / összes | Elindul szintenként | Curriculum-szint (tanítás) | Akció std | Task reward arány (bias) | Döntés |
-|---|---|---|---|---|---|---|---|---|---|---|
+| Dátum | Run (wandb) | `final_position` súly | Siker | Ütközés | Elindul: legrosszabb szint / összes | Elindul szintenként | Siker szintenként | Curriculum-szint (tanítás) | Akció std | Task reward arány (bias) | Döntés |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 """
     section = intro + "\n".join(render_row(r) for r in records) + "\n"
     with open(path) as f:
@@ -251,7 +262,8 @@ def main():
             break
         if any(r["attempt"] == attempt and r["status"] == "done" for r in records):
             continue
-        weight = args.start_weight * args.factor**attempt
+        # with a baseline checkpoint, attempt 0 is the start weight; otherwise attempt 1 trains it
+        weight = args.start_weight * args.factor ** (attempt if args.baseline_checkpoint else attempt - 1)
         name = f"goalw_{weight:g}"
         rec = {"attempt": attempt, "name": name, "weight": weight, "date": time.strftime("%Y-%m-%d %H:%M"), "status": "running"}
         records.append(rec)

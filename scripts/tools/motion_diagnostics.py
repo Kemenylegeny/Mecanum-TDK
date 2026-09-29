@@ -131,7 +131,11 @@ def statistics(r: dict) -> dict:
     dcmd = np.diff(r["cmd"], axis=0)
     bins = [0, 20, 45, 70, 110, 135, 160, 180.1]
     hist = np.histogram(direction, bins=bins)[0]
+    # robots that never got more than 0.3 m away from their start, and how far their goal was
+    stood = np.max(np.linalg.norm(r["pos"] - r["start"][None], axis=2), axis=0) < 0.3
     return {
+        "never_moved_frac": float(stood.mean()),
+        "never_moved_start_distance_m": sorted(round(float(x), 2) for x in straight[stood]),
         "arrived_frac": float(np.isfinite(arrival).mean()),
         "arrival_s_median": float(np.nanmedian(arrival)),
         "start_distance_m_median": float(np.median(straight)),

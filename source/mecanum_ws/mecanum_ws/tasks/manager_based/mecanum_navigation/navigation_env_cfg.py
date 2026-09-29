@@ -408,8 +408,9 @@ class MecanumNavigationPillarsEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = self.decimation
         # default material = material of the robot colliders (the URDF spawner binds none)
         self.sim.physics_material = mecanum.ROBOT_MATERIAL
-        # the default PhysX GPU buffers are enough for the 336 sphere colliders per robot (checked at 1536 envs, no
-        # overflow warning); raise gpu_max_rigid_patch_count etc. only if PhysX reports an overflow (costs GPU memory)
+        # contact patches of the 336 sphere colliders per robot: at 3072 envs on the pillar terrain PhysX needs ~370k
+        # (default 163840 -> "Patch buffer overflow", contacts are dropped and robots lose traction / stand still)
+        self.sim.physx.gpu_max_rigid_patch_count = 2**19
         # sensor update rate = policy rate
         self.scene.lidar.update_period = self.decimation * self.sim.dt
         # viewer / video camera: follows the robot of env 1 (overview_camera(self): all curriculum levels in view)
