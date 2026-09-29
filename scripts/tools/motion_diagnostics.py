@@ -13,6 +13,8 @@ direction reversals), saturation, and whether the wheels stop at the goal. Write
 Usage::
 
     python scripts/tools/motion_diagnostics.py --checkpoint logs/rsl_rl/mecanum_navigation_flat/<run>/model_1393.pt
+
+Extra ``env.<path>=<value>`` arguments override the environment config (e.g. ``env.episode_length_s=7.0``).
 """
 
 import argparse
@@ -28,12 +30,14 @@ parser.add_argument("--min_distance", type=float, default=2.0, help="Minimum sta
 parser.add_argument("--seed", type=int, default=7)
 parser.add_argument("--out_dir", default=None, help="Default: <checkpoint dir>/analysis_<checkpoint name>.")
 AppLauncher.add_app_launcher_args(parser)
-args_cli = parser.parse_args()
+args_cli, overrides = parser.parse_known_args()
 args_cli.headless = True
+sys.argv = [sys.argv[0]]
 simulation_app = AppLauncher(args_cli).app
 
 """Rest everything follows."""
 
+import ast
 import importlib.metadata as metadata
 import json
 import os
@@ -54,9 +58,30 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 
+def apply_overrides(env_cfg, items: list[str]):
+    """Apply ``env.a.b.c=value`` overrides (other prefixes are ignored)."""
+    for item in items:
+        key, _, value = item.partition("=")
+        if not key.startswith("env."):
+            continue
+        *path, leaf = key[len("env."):].split(".")
+        obj = env_cfg
+        for part in path:
+            obj = obj[part] if isinstance(obj, dict) else getattr(obj, part)
+        try:
+            value = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            pass
+        if isinstance(obj, dict):
+            obj[leaf] = value
+        else:
+            setattr(obj, leaf, value)
+
+
 def rollout():
     cfg = parse_env_cfg(args_cli.task, num_envs=args_cli.num_envs)
     cfg.seed = args_cli.seed
+    apply_overrides(cfg, overrides)
     cfg.commands.goal_pose.min_distance = args_cli.min_distance
     cfg.observations.policy.enable_corruption = False
     agent = handle_deprecated_rsl_rl_cfg(

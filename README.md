@@ -232,6 +232,20 @@ lépésenkénti átlaga az előző elfogadott policynél, vagyis a büntetés a 
 (legfeljebb 4 próba lépésenként). Minden run bekerül az `EXPERIMENTS.md`-be, és dátummal commitolódik / pusholódik.
 Riport: `logs/penalty_study/<study>/report.md`.
 
+## Egy tanítás felügyelet nélkül: tanítás → kiértékelés → mozgásdiagnosztika → EXPERIMENTS.md
+
+```bash
+WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem setsid nohup \
+  /home/bence.farkas@egroup.hu/miniconda3/envs/env_isaaclab/bin/python -u scripts/tools/train_eval_log.py \
+  --task Mecanum-Navigation-Pillars-v0 --name pillars7s_torque_actionrate --iterations 500 --wandb --video --git \
+  env.episode_length_s=7.0 env.rewards.wheel_torque_l2.weight=-0.00312 env.rewards.action_rate_l2.weight=-18.0 \
+  agent.algorithm.entropy_coef=0.0 > logs/runs/pillars7s_torque_actionrate.log 2>&1 < /dev/null &
+```
+
+A `key=value` argumentumok Hydra override-ok a tanításhoz; az `env.` kezdetűek a kiértékelésre és a
+`scripts/tools/motion_diagnostics.py`-ra is érvényesek. Eredmény: `logs/runs/<name>/result.json`, egy dátumozott sor
+az `EXPERIMENTS.md`-ben (commit + push `--git` esetén).
+
 ## Videó a tanításról
 
 A `--video` kapcsoló headless módban is működik (automatikusan bekapcsolja a kamerákat). A kamera az
