@@ -56,6 +56,9 @@ from mecanum_ws.tasks.manager_based.mecanum_navigation import mdp
 
 SUCCESS_RADIUS = 0.5
 TIME_BINS = 10
+# "started towards the goal": the goal distance dropped by at least START_PROGRESS_M within the first START_WINDOW_S
+START_WINDOW_S = 2.0
+START_PROGRESS_M = 0.5
 
 
 def main():
@@ -88,6 +91,8 @@ def main():
     path_len = torch.zeros(n, device=dev)
     start_dist = torch.full((n,), float("nan"), device=dev)
     arrival_step = torch.full((n,), float("nan"), device=dev)
+    early_dist = torch.full((n,), float("nan"), device=dev)
+    window_steps = round(START_WINDOW_S / u.step_dt)
     slow_steps = torch.zeros(n, device=dev)
     bin_speed = torch.zeros(n, TIME_BINS, device=dev)
     bin_count = torch.zeros(n, TIME_BINS, device=dev)
@@ -146,6 +151,7 @@ def main():
             dist_now = mdp.goal_distance(u, "goal_pose")
             arrived = (dist_now < SUCCESS_RADIUS) & torch.isnan(arrival_step) & ~done
             arrival_step = torch.where(arrived, ep_steps, arrival_step)
+            early_dist = torch.where((ep_steps == window_steps) & ~done, dist_now, early_dist)
             # spinning at the goal, stalling far from it
             at_goal = (dist_now < 0.3) & (ep_steps > 50) & ~done & (counting > 0)
             spin_sum += float(robot.data.root_ang_vel_b[at_goal, 2].abs().sum())
@@ -170,6 +176,8 @@ def main():
                         "time": float(ep_steps[i] * u.step_dt),
                         "path_len": float(path_len[i]),
                         "arrival_time": float(arrival_step[i] * u.step_dt),
+                        # an episode that ended before the window (crash) counts with its last distance
+                        "early_progress": float(start_dist[i] - (final_dist[i] if torch.isnan(early_dist[i]) else early_dist[i])),
                         "slow_frac": float(slow_steps[i] / ep_steps[i]),
                         "bin_speed": (bin_speed[i] / bin_count[i].clamp(min=1)).tolist(),
                         "bin_valid": (bin_count[i] > 0).tolist(),
@@ -186,6 +194,7 @@ def main():
                     t[done] = 0.0
                 start_dist[done] = float("nan")
                 arrival_step[done] = float("nan")
+                early_dist[done] = float("nan")
                 bin_speed[done] = 0.0
                 bin_count[done] = 0.0
             prev_pos = robot.data.root_pos_w[:, :2].clone()
@@ -239,10 +248,13 @@ def report(episodes: list[dict], episode_s: float, motion: dict):
     bins = np.array([x["bin_speed"] for x in e]); valid = np.array([x["bin_valid"] for x in e])
     prof = [bins[valid[:, j], j].mean() if valid[:, j].any() else float("nan") for j in range(TIME_BINS)]
     print("mean speed per 10 % of episode time [m/s]:", " ".join(f"{p:.2f}" for p in prof))
-    print("\nlevel  episodes  success  crashed  median final dist")
+    started = arr("early_progress") >= START_PROGRESS_M
+    print(f"\nlevel  episodes  success  crashed  median final dist  started (>= {START_PROGRESS_M} m closer "
+          f"in {START_WINDOW_S:g} s)  median progress in {START_WINDOW_S:g} s [m]")
     for L in sorted(set(lvl.astype(int))):
         m = lvl == L
-        print(f"{L:5d} {m.sum():9d} {succ[m].mean():8.1%} {coll[m].mean():8.1%} {np.median(arr('final_dist')[m]):12.2f}")
+        print(f"{L:5d} {m.sum():9d} {succ[m].mean():8.1%} {coll[m].mean():8.1%} {np.median(arr('final_dist')[m]):12.2f} "
+              f"{started[m].mean():17.1%} {np.median(arr('early_progress')[m]):24.2f}")
     crashes = [x for x in e if x["collided"]]
     if crashes:
         ang = np.abs(np.array([x["crash_angle_deg"] for x in crashes]))
