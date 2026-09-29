@@ -67,3 +67,17 @@ odaérés nem romlik, és a célzott metrika legalább 20%-kal csökken.
 | 2026-09-29 09:29 | [stage3_wheel_acc_l2_a1](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/f17x2oul) | 3 / 1 | `wheel_acc_l2 = -2.73e-05` (f = 0.1) | 3.0% | 0.0% | 4.6 | acc2: 5240 → 2330 (-56%) | rejected: too strong (success / arrival worse) -> weaker |
 | 2026-09-29 10:46 | [stage3_wheel_acc_l2_a2](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/6jlz1mun) | 3 / 2 | `wheel_acc_l2 = -1.36e-05` (f = 0.05) | 2.4% | 0.0% | 3.7 | acc2: 5240 → 2455 (-53%) | rejected: too strong (success / arrival worse) -> weaker |
 | 2026-09-29 12:03 | [stage3_wheel_acc_l2_a3](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/pzzdlbom) | 3 / 3 | `wheel_acc_l2 = -6.82e-06` (f = 0.025) | 96.9% | 0.0% | 6.1 | acc2: 5240 → 3076 (-41%) | rejected: too strong (success / arrival worse) -> weaker |
+
+## Célreward (`final_position`) súlyának emelése, oszlopok + curriculum (study `pillars7s_goalw`)
+
+`scripts/tools/goal_weight_sweep.py --study pillars7s_goalw`: az oszlopos feladat curriculummal, a flat7s-ben elfogadott
+büntetésekkel (`episode_length_s = 7`, `wheel_torque_l2 = -0.00312`, `action_rate_l2 = -18`, `entropy_coef = 0`).
+A 0. próba a leállított `pillars7s_torque_actionrate` run (súly 10); utána minden próba a súlyt
+2-szeresére emeli, és nulláról tanít (400 iteráció, 3072 env). Egy epizód akkor
+„indul el a cél felé”, ha az első 2 s alatt legalább 0.5 m-rel közelebb kerül a célhoz; a súly emelése leáll, ha ez
+**minden** szinten az epizódok legalább 80%-ára teljesül. Kiértékelés: determinisztikus policy, mind
+a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterációjából.
+
+| Dátum | Run (wandb) | `final_position` súly | Siker | Ütközés | Elindul: legrosszabb szint / összes | Elindul szintenként | Curriculum-szint (tanítás) | Akció std | Task reward arány (bias) | Döntés |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 16:18 | [goalw_baseline](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/bg1jpqqk) | 10 | 41.0% | 11.2% | 75% / 92% | 0:99% 1:97% 2:97% 3:98% 4:94% 5:96% 6:96% 7:86% 8:85% 9:75% | 3.28 | 0.01 | 0.37 (be) | nem minden szinten (legrosszabb: 9. szint) -> emelés |
