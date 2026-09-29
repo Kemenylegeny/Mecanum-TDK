@@ -42,8 +42,9 @@ LIDAR_SENSOR = SceneEntityCfg("lidar")
 
 WHEELS = SceneEntityCfg("robot", joint_names=mecanum.WHEEL_JOINT_NAMES, preserve_order=True)
 
-EPISODE_LENGTH_S = 12.0
-"""Episode length = time the robot has to reach the goal [s] (goals are up to ~6.4 m away)."""
+EPISODE_LENGTH_S = 9.0
+"""Episode length = time the robot has to reach the goal [s] (goals are up to ~6.4 m away). 9 s since 2026-09-29:
+with 7 s, 44 % of the episodes timed out 0.6-1.8 m before the goal while still driving (pillars7s_goalw_v2 goalw_10)."""
 
 TASK_REWARD_DURATION = 2.0
 """Duration ``T_r`` of the final-position task reward at the end of the episode [s]."""
