@@ -35,6 +35,7 @@ def parse_args():
     parser.add_argument("--note", default="", help="What this run tests (goes into EXPERIMENTS.md).")
     parser.add_argument("--iterations", type=int, default=400)
     parser.add_argument("--resume_from", default=None, help="Checkpoint to continue from (same experiment folder).")
+    parser.add_argument("--checkpoint", default=None, help="Skip training: evaluate this checkpoint (its run's train.log).")
     parser.add_argument("--num_envs", type=int, default=3072)
     parser.add_argument("--eval_envs", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
@@ -66,7 +67,7 @@ def main():
         src_dir, src_ckpt = os.path.split(os.path.abspath(args.resume_from))
         cmd += ["--resume", "--load_run", f"^{re.escape(os.path.basename(src_dir))}$", "--checkpoint", f"^{re.escape(src_ckpt)}$"]
         start_iter = int(re.search(r"model_(\d+)\.pt", src_ckpt).group(1))
-        final = f"model_{start_iter + args.iterations}.pt"
+        final = f"model_{start_iter + args.iterations - 1}.pt"  # RSL-RL continues at start_iter, saves the last one
     cmd += overrides
     started = time.time()
 
@@ -81,12 +82,16 @@ def main():
     log(f"[{args.name}] training {args.task}, {args.iterations} iterations"
         f"{' from ' + os.path.relpath(args.resume_from, ROOT) if args.resume_from else ''}: {overrides}")
     train_log = os.path.join(out_dir, "train.log")
-    run(cmd, train_log, env, done=finished)
-    if not finished():
-        log(f"[{args.name}] training failed, see {train_log}")
-        return 1
-    d = run_dir()
-    ckpt = latest_checkpoint(d)
+    if args.checkpoint:
+        ckpt = os.path.abspath(args.checkpoint)
+        d = os.path.dirname(ckpt)
+    else:
+        run(cmd, train_log, env, done=finished)
+        if not finished():
+            log(f"[{args.name}] training failed, see {train_log}")
+            return 1
+        d = run_dir()
+        ckpt = latest_checkpoint(d)
     env_overrides = [o for o in overrides if o.startswith("env.")]
 
     # evaluation (deterministic policy, all terrain levels, goals >= 1 m away)
