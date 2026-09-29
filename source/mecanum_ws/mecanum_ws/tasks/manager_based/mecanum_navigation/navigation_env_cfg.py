@@ -49,6 +49,15 @@ with 7 s, 44 % of the episodes timed out 0.6-1.8 m before the goal while still d
 TASK_REWARD_DURATION = 2.0
 """Duration ``T_r`` of the final-position task reward at the end of the episode [s]."""
 
+PILLAR_PENALTIES = {
+    # flat7s penalty study: calibrated w = -f * 10 / (m_ref * T), accepted
+    "wheel_torque_l2": -0.00312,  # f = 0.2
+    "action_rate_l2": -18.0,  # f = 0.05
+    # 2026-09-29, like the torque penalty: f = 0.2, m_ref = slip2 0.0160 m^2/s^2 of pillars7s_goalw10_cont800, T = 9 s
+    "wheel_slip_l2": -13.9,
+}
+"""Penalty weights of the pillar task (the flat task keeps all penalties at zero)."""
+
 FLAT_EPISODE_LENGTH_S = 7.0
 """Episode length on flat ground [s]: short enough that the robot has to drive to the goal instead of creeping (with
 12 s it arrived after ~5.6 s and waited; the task reward window is the last ``TASK_REWARD_DURATION`` seconds)."""
@@ -404,6 +413,9 @@ class MecanumNavigationPillarsEnvCfg(ManagerBasedRLEnvCfg):
         # general settings: 360 Hz physics (validated: below it the roller contact noise is numerical), 51 Hz policy
         self.decimation = 7
         self.episode_length_s = EPISODE_LENGTH_S
+        # penalties of the pillar training (EXPERIMENTS.md)
+        for term, weight in PILLAR_PENALTIES.items():
+            getattr(self.rewards, term).weight = weight
         # simulation settings
         self.sim.dt = 1.0 / 360.0
         self.sim.render_interval = self.decimation
@@ -457,6 +469,9 @@ class MecanumNavigationFlatEnvCfg(MecanumNavigationPillarsEnvCfg):
         pillars.object_params_start.num_objects = 0
         pillars.object_params_end.num_objects = 0
         self.episode_length_s = FLAT_EPISODE_LENGTH_S
+        # the flat penalty study adds its penalties via Hydra on top of zero weights
+        for term in PILLAR_PENALTIES:
+            getattr(self.rewards, term).weight = 0.0
         # all tiles are identical: spread the robots over all of them and keep them there
         self.scene.terrain.terrain_generator.curriculum = False
         self.scene.terrain.max_init_terrain_level = None
