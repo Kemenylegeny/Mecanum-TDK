@@ -59,3 +59,4 @@ odaérés nem romlik, és a célzott metrika legalább 20%-kal csökken.
 | Dátum | Run (wandb) | Lépés / próba | Új büntetés, súly (f) | Siker | Ütközés | Odaérés [s] | Célzott metrika: ref → új | Döntés |
 |---|---|---|---|---|---|---|---|---|
 | 2026-09-29 01:45 | [stage0_base](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/qrdfm9um) | 0 / 0 | – (csak pozitív jutalom) | 100.0% | 0.0% | 3.0 | – | accepted (gate) |
+| 2026-09-29 03:02 | [stage1_wheel_torque_l2_a0](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/asvukm8q) | 1 / 0 | `wheel_torque_l2 = -0.00312` (f = 0.2) | 100.0% | 0.0% | 4.0 | torque2: 91.61 → 2.739 (-97%) | accepted |
