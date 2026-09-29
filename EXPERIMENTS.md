@@ -109,3 +109,23 @@ a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterác
 | Dátum | Run (wandb) | Feladat | Beállítás (Hydra override) | Siker | Ütközés | Siker (7–9. szint) | Odaérés [s] | Végső curriculum-szint | Mozgás | Megjegyzés |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-09-29 23:13 | [pillars7s_goalw10_cont800](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/l11o043d) | `Mecanum-Navigation-Pillars-v0` | `env.episode_length_s=7.0` `env.rewards.final_position.weight=10.0` `env.rewards.wheel_torque_l2.weight=-0.00312` `env.rewards.action_rate_l2.weight=-18.0` `agent.algorithm.entropy_coef=0.0` | 38.7% | 13.6% | 21.2% | 5.1 | 6.3098 | sebesség 0.59 m/s, előre 43%, pörgés a célban 1.15 rad/s | goalw_10 (pillars7s_goalw_v2) folytatása model_399-ből +400 iterációval, ugyanazokkal a súlyokkal |
+
+### 2026-09-30 — Diagnózis: miért lett rosszabb a folytatott policy (`pillars7s_goalw10_cont800`, model_399 → model_798)
+
+| | model_399 | model_798 |
+|---|---|---|
+| Oszlopok, összes szint (2048 ep.) | 41.9% siker, 14.5% ütközés | 38.7% siker, 13.6% ütközés |
+| 0. / 1. szint | 78% / 71% | 49% / 52% |
+| 4–8. szint | 42 / 31 / 29 / 19 / 21% | 46 / 39 / 35 / 24 / 23% |
+| **Sík terep, nincs oszlop** (2048 ep.) | **93.2%**, odaérés 4.9 s | **50.2%**, odaérés 5.7 s |
+| Akció std / tanulási ráta a tanítás végén | 0.01 / 3.4e-5 | ≈0.002 / 1e-5 (minimum) |
+
+- **Felejtés a curriculum miatt:** a folytatásban a curriculum-szint 0-ról 6.3-ra mászott (az első runban 5.5), a
+  tanítási adat nagy része sűrű oszlopos csempéről jött. A policy a nehéz szinteken kicsit javult, de az üres
+  környezetben (0–1. szint, sík terep) az epizód második felében korábban lassít és ~0.7 m-rel a cél előtt megáll.
+- **Nincs felfedezés:** entropy 0 mellett az akcióváltás-büntetés közvetlenül bünteti a zajt, a std végig csökkent
+  (entrópia −10 → −19.5); az adaptív ütemező emiatt a tanulási rátát a minimumra vitte. A task reward a ~125.
+  iteráció óta platón van (~0.70/s) mindkét szakaszban: a folytatás nem tanult újat, csak elsodródott az adat
+  eloszlásával.
+- A tanítási átlag (Mean reward, Episode_Reward) ezt nem mutatja, mert a nehezebb csempéken elért hasonló jutalom
+  elfedi a könnyű csempéken történő romlást.
