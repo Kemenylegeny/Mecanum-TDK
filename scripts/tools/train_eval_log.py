@@ -19,6 +19,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -33,6 +34,7 @@ def parse_args():
     parser.add_argument("--name", required=True, help="Run name (log folder suffix, W&B run name).")
     parser.add_argument("--note", default="", help="What this run tests (goes into EXPERIMENTS.md).")
     parser.add_argument("--iterations", type=int, default=400)
+    parser.add_argument("--resume_from", default=None, help="Checkpoint to continue from (same experiment folder).")
     parser.add_argument("--num_envs", type=int, default=3072)
     parser.add_argument("--eval_envs", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
@@ -59,8 +61,13 @@ def main():
         cmd += ["--video", "--video_length", "500", "--video_interval", str(48 * 100)]
     if args.wandb:
         cmd += ["--logger", "wandb", "--log_project_name", args.wandb_project]
-    cmd += overrides
     final = f"model_{args.iterations - 1}.pt"
+    if args.resume_from:
+        src_dir, src_ckpt = os.path.split(os.path.abspath(args.resume_from))
+        cmd += ["--resume", "--load_run", f"^{re.escape(os.path.basename(src_dir))}$", "--checkpoint", f"^{re.escape(src_ckpt)}$"]
+        start_iter = int(re.search(r"model_(\d+)\.pt", src_ckpt).group(1))
+        final = f"model_{start_iter + args.iterations}.pt"
+    cmd += overrides
     started = time.time()
 
     def run_dir():
@@ -71,7 +78,8 @@ def main():
         d = run_dir()
         return d is not None and os.path.exists(os.path.join(d, final))
 
-    log(f"[{args.name}] training {args.task}, {args.iterations} iterations: {overrides}")
+    log(f"[{args.name}] training {args.task}, {args.iterations} iterations"
+        f"{' from ' + os.path.relpath(args.resume_from, ROOT) if args.resume_from else ''}: {overrides}")
     train_log = os.path.join(out_dir, "train.log")
     run(cmd, train_log, env, done=finished)
     if not finished():
@@ -133,15 +141,18 @@ def main():
 |---|---|---|---|---|---|---|---|---|---|---|
 """
     link = f"[{args.name}]({url})" if url else args.name
+    with open(train_log, errors="ignore") as f:
+        overflow = f.read().count("buffer overflow")
+    note = args.note + (f" **PhysX overflow: {overflow}×**" if overflow else "")
     if result:
         mv = (f"sebesség {diag.get('speed_while_moving_median', float('nan')):.2f} m/s, előre "
               f"{diag.get('motion_direction_share', {}).get('0-20 deg', float('nan')):.0%}, pörgés a célban "
               f"{diag.get('yaw_rate_at_goal_median') or 0:.2f} rad/s") if diag else "-"  # fmt: skip
         row = (f"| {time.strftime('%Y-%m-%d %H:%M')} | {link} | `{args.task}` | {' '.join(f'`{o}`' for o in overrides)} "
                f"| {result['success']:.1%} | {result['crashed']:.1%} | {result['success_hard']:.1%} | {result['median_arrival_s']:.1f} "
-               f"| {level if level is not None else '-'} | {mv} | {args.note} |")  # fmt: skip
+               f"| {level if level is not None else '-'} | {mv} | {note} |")  # fmt: skip
     else:
-        row = f"| {time.strftime('%Y-%m-%d %H:%M')} | {link} | `{args.task}` | {' '.join(overrides)} | kiértékelés sikertelen | | | | | | {args.note} |"
+        row = f"| {time.strftime('%Y-%m-%d %H:%M')} | {link} | `{args.task}` | {' '.join(overrides)} | kiértékelés sikertelen | | | | | | {note} |"
     with open(path, "w") as f:
         f.write(text.rstrip("\n") + "\n" + row + "\n")
     log(f"[{args.name}] {row}")
