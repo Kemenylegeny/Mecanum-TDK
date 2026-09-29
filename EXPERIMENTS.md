@@ -129,3 +129,19 @@ a 10 szint, célok ≥ 1 m-re. A tanítási oszlopok a tanítás utolsó iterác
   eloszlásával.
 - A tanítási átlag (Mean reward, Episode_Reward) ezt nem mutatja, mert a nehezebb csempéken elért hasonló jutalom
   elfedi a könnyű csempéken történő romlást.
+
+## Slip-büntetés súlya, oszlopok + curriculum, 9 s (study `pillars9s_slipw`)
+
+`scripts/tools/slip_sweep.py --study pillars9s_slipw`: az oszlopos feladat alapbeállításával (9 s,
+`final_position` 10, nyomaték −0.00312, akcióváltás −18, entropy 0), csak a `wheel_slip_l2` súlya változik; minden
+próba nulláról, 400 iteráció. Súly: `w = −f · 10 / (m_ref · 9 s)`,
+`m_ref` = 0.016 m²/s² (slip2 lépésenként a legutóbbi slip nélküli policynél). Referencia: slip nélküli
+pillaros policy (7 s). Elfogadás: egyik szintcsoport sikere sem romlik
+5%-pontnál többet, az ütközés legfeljebb 3%-ponttal nő, a slip2 legalább
+20%-kal csökken. Kiértékelés: determinisztikus, mind a 10 szint, célok ≥ 1 m, 256 env × 8 epizód,
+seed 1. Mozgás (`motion_diagnostics.py`): forgás a célnál / menet közben, előre haladás aránya, sebesség.
+
+| Dátum | Run (wandb) | Slip súly | Siker | Siker 0–3 / 4–6 / 7–9 | Ütközés | Odaérés [s] | slip2 (ref-hez) | Mozgás | Döntés |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-30 01:06 | [reference_no_slip](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/0r2jwu2a) | 0 (f = 0) | 42.9% | 66% / 34% / 21% | 14.1% | 5.1 | 0.0267 | 0.58 / 0.27 rad/s, előre 55%, 0.62 m/s | referencia (slip nélkül) |
+
