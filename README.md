@@ -262,6 +262,23 @@ ha ez minden szinten az epizódok ≥ 80%-ára igaz. A tábla a szintenkénti si
 hibáinak számát is mutatja. Minden súlyváltás (indításkor és eredménnyel) bekerül az
 `EXPERIMENTS.md`-be, commit + push. Rekordok: `logs/goal_sweep/<study>/records.json`.
 
+## Slip-büntetés hangolása (oszlopok, 9 s)
+
+```bash
+WANDB_USERNAME=varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem setsid nohup \
+  /home/bence.farkas@egroup.hu/miniconda3/envs/env_isaaclab/bin/python -u scripts/tools/slip_sweep.py \
+  --ref_checkpoint logs/rsl_rl/mecanum_navigation_pillars/2026-09-29_17-02-36_pillars7s_goalw_v2_goalw_10/model_399.pt \
+  --first_run_dir logs/rsl_rl/mecanum_navigation_pillars/2026-09-29_23-14-53_pillars9s_slip \
+  --wandb --video --git > logs/slip_sweep/pillars9s_slipw.log 2>&1 < /dev/null &
+```
+
+Csak a `wheel_slip_l2` súlya változik (a többi az oszlopos feladat alapbeállítása), minden próba nulláról, 400
+iteráció. Súly `w = −f · 10 / (m_ref · 9 s)`; túl erős → f felére, nincs hatás → duplájára, közrefogva mértani közép;
+az első elfogadottnál vagy 4 próba után leáll. Elfogadás a slip nélküli referenciához képest: egyik szintcsoport
+(0–3, 4–6, 7–9) sikere sem romlik 5 %-pontnál többet, az ütközés legfeljebb 3 %-ponttal nő, a slip2 ≥ 20 %-kal csökken.
+Az 1. próba lehet egy már futó tanítás (`--first_run_dir`, ennek a 400. checkpointja); a következő tanítás csak akkor
+indul, ha a GPU szabad. Eredmény: `EXPERIMENTS.md` (commit + push minden súlynál), `logs/slip_sweep/<study>/`.
+
 ## Videó a tanításról
 
 A `--video` kapcsoló headless módban is működik (automatikusan bekapcsolja a kamerákat). A kamera az
