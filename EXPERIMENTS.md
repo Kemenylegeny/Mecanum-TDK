@@ -144,4 +144,4 @@ seed 1. Mozgás (`motion_diagnostics.py`): forgás a célnál / menet közben, e
 | Dátum | Run (wandb) | Slip súly | Siker | Siker 0–3 / 4–6 / 7–9 | Ütközés | Odaérés [s] | slip2 (ref-hez) | Mozgás | Döntés |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-09-30 01:06 | [reference_no_slip](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/0r2jwu2a) | 0 (f = 0) | 42.9% | 66% / 34% / 21% | 14.1% | 5.1 | 0.0267 | 0.58 / 0.27 rad/s, előre 55%, 0.62 m/s | referencia (slip nélkül) |
-| 2026-09-30 01:06 | pillars9s_slip@400 | -13.9 (f = 0.2) | | | | | | | | tanítás fut |
+| 2026-09-30 01:46 | [pillars9s_slip@400](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/lc3dyxmh) | -13.9 (f = 0.2) | 30.3% | 58% / 17% / 7% | 6.4% | 6.3 | 0.0015 (-94%) | 0.43 / 0.18 rad/s, előre 55%, 0.48 m/s | túl erős (siker romlik: 0-3, 4-6, 7-9. szint) -> gyengébb |
