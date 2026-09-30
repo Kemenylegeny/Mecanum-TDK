@@ -77,6 +77,8 @@ class RobotParams:
     """Mass of the pendulum front axle [kg]."""
     axle_swing: float = 0.12
     """+- swing of the front axle around the x axis [rad] (~3 cm at the wheels)."""
+    front_axle: bool = True
+    """Pendulum front axle; False: rigid chassis, all four wheels on ``base_link``."""
 
 
 WHEELS = {
@@ -206,7 +208,7 @@ def build_urdf(w: WheelParams, rb: RobotParams, roller_mesh_path: str) -> str:
     pitch = 2 * math.pi / w.num_rollers
     # pendulum front axle (swings around x): 3-point support, statically determinate
     am = rb.axle_mass
-    out.append(
+    out.append("" if not rb.front_axle else
         '  <link name="front_axle">\n'
         f'    <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.02" length="{2 * rb.wheel_y - hw:.4g}"/>'
         '</geometry><material name="hub"/></visual>\n'
@@ -220,7 +222,7 @@ def build_urdf(w: WheelParams, rb: RobotParams, roller_mesh_path: str) -> str:
     )
     for name, (sx, sy, h) in WHEELS.items():
         wheel = f"{name}_wheel"
-        if sx > 0:
+        if sx > 0 and rb.front_axle:
             parent, origin = "front_axle", (0.0, sy * rb.wheel_y, 0.0)
         else:
             parent, origin = "base_link", (sx * rb.wheel_x, sy * rb.wheel_y, rb.wheel_z)

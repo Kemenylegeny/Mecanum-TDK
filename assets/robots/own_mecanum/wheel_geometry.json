@@ -6,11 +6,11 @@
     "roller_mid_radius": 0.00671,
     "roller_half_length": 0.01275,
     "spheres_per_roller": 6,
-    "roller_mass": 0.00375,
+    "roller_mass": 0.005,
     "roller_damping": 1e-05,
     "hub_radius": 0.021,
     "hub_width": 0.0336,
-    "hub_mass": 0.04378
+    "hub_mass": 0.055
   },
   "robot": {
     "chassis_size": [
@@ -18,14 +18,15 @@
       0.2788,
       0.133
     ],
-    "chassis_mass": 1.5335,
+    "chassis_mass": 2.6,
     "wheel_x": 0.064,
     "wheel_y": 0.1526,
     "wheel_z": -0.0415,
-    "axle_mass": 0.05,
-    "axle_swing": 0.05
+    "axle_mass": 1.0,
+    "axle_swing": 0.12,
+    "front_axle": false
   },
-  "num_links": 42,
+  "num_links": 41,
   "envelope": {
     "envelope_radius": 0.03028,
     "min_effective_radius": 0.030211130526186326,
