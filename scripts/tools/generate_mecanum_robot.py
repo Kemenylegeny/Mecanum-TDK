@@ -266,12 +266,22 @@ def main():
     parser.add_argument("--num_rollers", type=int, default=WheelParams.num_rollers)
     parser.add_argument("--spheres_per_roller", type=int, default=WheelParams.spheres_per_roller)
     parser.add_argument("--scale", type=float, default=1.0, help="Uniform scale of the FUJI wheel geometry.")
+    parser.add_argument("--config", default=None,
+                        help='JSON with "wheel" / "robot" fields overriding WheelParams / RobotParams (another robot).')  # fmt: skip
     args = parser.parse_args()
 
     w = WheelParams(num_rollers=args.num_rollers, spheres_per_roller=args.spheres_per_roller)
     for f in ("roller_center_radius", "roller_mid_radius", "roller_half_length", "hub_radius", "hub_width"):
         setattr(w, f, getattr(w, f) * args.scale)
     rb = RobotParams()
+    if args.config:
+        with open(args.config) as f:
+            cfg = json.load(f)
+        for obj, key in ((w, "wheel"), (rb, "robot")):
+            for k, v in cfg.get(key, {}).items():
+                if not hasattr(obj, k):
+                    raise KeyError(f"unknown {key} parameter: {k}")
+                setattr(obj, k, tuple(v) if isinstance(v, list) else v)
 
     os.makedirs(os.path.join(args.out_dir, "meshes"), exist_ok=True)
     roller_mesh(w).export(os.path.join(args.out_dir, "meshes", "roller.stl"))

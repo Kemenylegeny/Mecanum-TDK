@@ -1,0 +1,30 @@
+{
+  "_source": "measured from assets/robots/own_mecanum/stl (scripts/tools/analyze_wheel_mesh.py + wheel centers of the assembly STL), 2026-09-30",
+  "_assumptions": "masses: PLA 1.24 g/cm3 solid (unknown infill / roller material); chassis mass = Fusion base_link only; pendulum front axle kept from the simulator model (real robot: to be clarified)",
+  "wheel": {
+    "num_rollers": 9,
+    "roller_angle_deg": 45.0,
+    "roller_center_radius": 0.02357,
+    "roller_mid_radius": 0.00671,
+    "roller_half_length": 0.01275,
+    "spheres_per_roller": 6,
+    "roller_mass": 0.00375,
+    "roller_damping": 1e-05,
+    "hub_radius": 0.021,
+    "hub_width": 0.0336,
+    "hub_mass": 0.04378
+  },
+  "robot": {
+    "chassis_size": [
+      0.2655,
+      0.2788,
+      0.133
+    ],
+    "chassis_mass": 1.5335,
+    "wheel_x": 0.064,
+    "wheel_y": 0.1526,
+    "wheel_z": -0.0415,
+    "axle_mass": 0.05,
+    "axle_swing": 0.05
+  }
+}
