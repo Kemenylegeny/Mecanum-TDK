@@ -4,9 +4,9 @@
   <material name="hub"><color rgba="0.15 0.15 0.15 1"/></material>
   <material name="roller"><color rgba="0.85 0.55 0.1 1"/></material>
   <link name="base_link">
-    <visual><geometry><box size="0.2655 0.2788 0.133"/></geometry><material name="chassis"/></visual>
-    <collision><geometry><box size="0.2655 0.2788 0.133"/></geometry></collision>
-    <inertial><mass value="2.6"/><inertia ixx="0.020674" iyy="0.0191055" izz="0.0321143" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><origin xyz="0 0 -0.0648" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/chassis_visual.stl"/></geometry><material name="chassis"/></visual>
+    <collision><origin xyz="0 0 -0.0648" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/chassis_collision.stl"/></geometry></collision>
+    <inertial><origin xyz="0.016016 -0.000239 0.001111"/><mass value="2.6"/><inertia ixx="0.018614" iyy="0.015749" izz="0.028361" ixy="-3.052e-05" ixz="4.069e-05" iyz="-1.695e-05"/></inertial>
   </link>
   <link name="front_left_wheel">
     <visual><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.021" length="0.0336"/></geometry><material name="hub"/></visual>

@@ -79,6 +79,21 @@ class RobotParams:
     """+- swing of the front axle around the x axis [rad] (~3 cm at the wheels)."""
     front_axle: bool = True
     """Pendulum front axle; False: rigid chassis, all four wheels on ``base_link``."""
+    chassis_mesh_source: str | None = None
+    """Chassis mesh (e.g. CAD STL, relative to the config file) instead of the box: decimated for the visual, its convex
+    hull as collider (written to ``meshes/chassis_visual.stl`` / ``chassis_collision.stl``)."""
+    chassis_mesh_unit: float = 0.001
+    """Unit of the chassis mesh [m]."""
+    chassis_mesh_cell: float = 0.002
+    """Vertex clustering cell of the visual decimation [m] (0: full resolution)."""
+    chassis_mesh_xyz: tuple = (0.0, 0.0, 0.0)
+    """Origin of the chassis mesh in ``base_link`` [m]."""
+    chassis_mesh_rpy: tuple = (0.0, 0.0, 0.0)
+    """Orientation of the chassis mesh in ``base_link`` [rad]."""
+    chassis_com: tuple | None = None
+    """Center of mass in ``base_link`` [m] (default: origin)."""
+    chassis_inertia: tuple | None = None
+    """(ixx, iyy, izz, ixy, ixz, iyz) about the center of mass [kg m^2] (default: box)."""
 
 
 WHEELS = {
@@ -148,6 +163,20 @@ def envelope_report(w: WheelParams, h: int = 1, samples: int = 721) -> dict:
     }
 
 
+def decimate(mesh: trimesh.Trimesh, cell: float) -> trimesh.Trimesh:
+    """Vertex-clustering decimation: vertices merged on a ``cell`` grid, degenerate / duplicate faces removed."""
+    q = np.round(mesh.vertices / cell).astype(np.int64)
+    uq, inv = np.unique(q, axis=0, return_inverse=True)
+    inv = inv.reshape(-1)
+    verts = np.zeros((len(uq), 3))
+    np.add.at(verts, inv, mesh.vertices)
+    verts /= np.bincount(inv)[:, None]
+    faces = inv[mesh.faces]
+    faces = faces[(faces[:, 0] != faces[:, 1]) & (faces[:, 1] != faces[:, 2]) & (faces[:, 0] != faces[:, 2])]
+    _, idx = np.unique(np.sort(faces, axis=1), axis=0, return_index=True)
+    return trimesh.Trimesh(verts, faces[np.sort(idx)], process=False)
+
+
 def roller_mesh(w: WheelParams, n_axial: int = 24, sections: int = 32) -> trimesh.Trimesh:
     """Barrel-shaped visual mesh of a roller, axis along x."""
     s = np.linspace(-w.roller_half_length, w.roller_half_length, n_axial)
@@ -190,11 +219,25 @@ def build_urdf(w: WheelParams, rb: RobotParams, roller_mesh_path: str) -> str:
     out.append('  <material name="chassis"><color rgba="0.2 0.35 0.6 1"/></material>\n')
     out.append('  <material name="hub"><color rgba="0.15 0.15 0.15 1"/></material>\n')
     out.append('  <material name="roller"><color rgba="0.85 0.55 0.1 1"/></material>\n')
+    if rb.chassis_mesh_source:
+        origin = f'<origin xyz="{_fmt(rb.chassis_mesh_xyz)}" rpy="{_fmt(rb.chassis_mesh_rpy)}"/>'
+        visual = f'<geometry><mesh filename="meshes/chassis_visual.stl"/></geometry>'
+        collision = f'<geometry><mesh filename="meshes/chassis_collision.stl"/></geometry>'
+    else:
+        origin, visual = "", f'<geometry><box size="{_fmt(rb.chassis_size)}"/></geometry>'
+        collision = visual
+    if rb.chassis_inertia is not None:
+        ixx, iyy, izz, ixy, ixz, iyz = rb.chassis_inertia
+        inertial = (f'    <inertial><origin xyz="{_fmt(rb.chassis_com or (0.0, 0.0, 0.0))}"/><mass value="{m:.6g}"/>'
+                    f'<inertia ixx="{ixx:.6g}" iyy="{iyy:.6g}" izz="{izz:.6g}" ixy="{ixy:.6g}" ixz="{ixz:.6g}" iyz="{iyz:.6g}"/>'
+                    "</inertial>\n")  # fmt: skip
+    else:
+        inertial = _inertial(m, m * (ly**2 + lz**2) / 12, m * (lx**2 + lz**2) / 12, m * (lx**2 + ly**2) / 12)
     out.append(
         '  <link name="base_link">\n'
-        f'    <visual><geometry><box size="{_fmt(rb.chassis_size)}"/></geometry><material name="chassis"/></visual>\n'
-        f'    <collision><geometry><box size="{_fmt(rb.chassis_size)}"/></geometry></collision>\n'
-        + _inertial(m, m * (ly**2 + lz**2) / 12, m * (lx**2 + lz**2) / 12, m * (lx**2 + ly**2) / 12)
+        f'    <visual>{origin}{visual}<material name="chassis"/></visual>\n'
+        f'    <collision>{origin}{collision}</collision>\n'
+        + inertial
         + "  </link>\n"
     )
     # hub inertia: solid cylinder around y
@@ -287,6 +330,15 @@ def main():
 
     os.makedirs(os.path.join(args.out_dir, "meshes"), exist_ok=True)
     roller_mesh(w).export(os.path.join(args.out_dir, "meshes", "roller.stl"))
+    if rb.chassis_mesh_source:
+        src = os.path.join(os.path.dirname(os.path.abspath(args.config)), rb.chassis_mesh_source)
+        chassis = trimesh.load(src)
+        chassis.apply_scale(rb.chassis_mesh_unit)
+        visual = decimate(chassis, rb.chassis_mesh_cell) if rb.chassis_mesh_cell > 0 else chassis
+        visual.export(os.path.join(args.out_dir, "meshes", "chassis_visual.stl"))
+        chassis.convex_hull.export(os.path.join(args.out_dir, "meshes", "chassis_collision.stl"))
+        print(f"[INFO] chassis mesh: {len(chassis.faces)} -> {len(visual.faces)} triangles (visual), "
+              f"{len(chassis.convex_hull.faces)} (collision hull)")  # fmt: skip
     urdf = build_urdf(w, rb, "meshes/roller.stl")
     num_links = urdf.count("<link ")
     if num_links > 64:

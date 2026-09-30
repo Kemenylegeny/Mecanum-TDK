@@ -24,7 +24,33 @@
     "wheel_z": -0.0415,
     "axle_mass": 1.0,
     "axle_swing": 0.12,
-    "front_axle": false
+    "front_axle": false,
+    "chassis_mesh_source": "../MecanumRobot_orientalt_v2_description/meshes/base_link.stl",
+    "chassis_mesh_unit": 0.001,
+    "chassis_mesh_cell": 0.002,
+    "chassis_mesh_xyz": [
+      0.0,
+      0.0,
+      -0.0648
+    ],
+    "chassis_mesh_rpy": [
+      0.0,
+      0.0,
+      3.141592653589793
+    ],
+    "chassis_com": [
+      0.016016,
+      -0.000239,
+      0.001111
+    ],
+    "chassis_inertia": [
+      0.018614,
+      0.015749,
+      0.028361,
+      -3.052e-05,
+      4.069e-05,
+      -1.695e-05
+    ]
   },
   "num_links": 41,
   "envelope": {
