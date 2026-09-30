@@ -542,8 +542,15 @@ class MecanumNavigationFlatOwnEnvCfg(MecanumNavigationFlatEnvCfg):
         super().__post_init__()
         apply_robot(self, "own")
         self.episode_length_s = OWN_FLAT_EPISODE_LENGTH_S
-        # the robot is ~0.3 m long: follow camera closer than for the FUJI robot
-        self.viewer.eye = (-1.2, -1.2, 1.0)
+        # the robot is ~0.3 m long (FUJI: 0.66 m): follow camera closer, goal markers and arrows ~0.4x
+        # camera high and far enough that the goal (up to ~4.5 m away) is in view
+        self.viewer.eye = (-2.5, -2.5, 3.0)
+        cmd = self.commands.goal_pose
+        cmd.arrow_height = 0.12
+        cmd.goal_visualizer_cfg.markers["goal"].radius = 0.08
+        cmd.goal_visualizer_cfg.markers["goal_highlight"].radius = 0.15
+        cmd.direction_visualizer_cfg.markers["arrow"].scale = (0.08, 0.08, 0.12)
+        cmd.direction_visualizer_cfg.markers["arrow_highlight"].scale = (0.12, 0.12, 0.18)
         for term, weight in OWN_FLAT_REWARDS.items():
             getattr(self.rewards, term).weight = weight
 
