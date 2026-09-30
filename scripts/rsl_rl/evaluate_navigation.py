@@ -51,7 +51,7 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper, handle_deprecated_rsl_rl_cfg
 from isaaclab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 
 import mecanum_ws.tasks  # noqa: F401
-from mecanum_ws.robots import mecanum
+from mecanum_ws.tasks.manager_based.mecanum_navigation.navigation_env_cfg import robot_module
 from mecanum_ws.tasks.manager_based.mecanum_navigation import mdp
 
 SUCCESS_RADIUS = 0.5
@@ -65,6 +65,7 @@ def main():
     env_cfg = parse_env_cfg(args_cli.task, num_envs=args_cli.num_envs)
     env_cfg.seed = args_cli.seed
     apply_overrides(env_cfg, overrides)
+    mecanum = robot_module(getattr(env_cfg, "robot_name", "fuji"))  # robot constants of the task
     # all difficulty levels, frozen
     env_cfg.scene.terrain.max_init_terrain_level = None
     env_cfg.curriculum.terrain_levels = None

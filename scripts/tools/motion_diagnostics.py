@@ -52,7 +52,7 @@ from isaaclab_rl.rsl_rl import RslRlVecEnvWrapper, handle_deprecated_rsl_rl_cfg
 from isaaclab_tasks.utils import load_cfg_from_registry, parse_env_cfg
 
 import mecanum_ws.tasks  # noqa: F401
-from mecanum_ws.robots import mecanum
+from mecanum_ws.tasks.manager_based.mecanum_navigation.navigation_env_cfg import robot_module
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
@@ -82,6 +82,7 @@ def rollout():
     cfg = parse_env_cfg(args_cli.task, num_envs=args_cli.num_envs)
     cfg.seed = args_cli.seed
     apply_overrides(cfg, overrides)
+    mecanum = robot_module(getattr(cfg, "robot_name", "fuji"))  # robot constants of the task
     cfg.commands.goal_pose.min_distance = args_cli.min_distance
     cfg.observations.policy.enable_corruption = False
     agent = handle_deprecated_rsl_rl_cfg(
@@ -112,7 +113,7 @@ def rollout():
             rec["wheel"].append(robot.data.joint_vel[:, wheel_ids].clone())
             rec["d"].append(torch.linalg.norm(target - robot.data.root_pos_w[:, :2], dim=1))
     data = {k: torch.stack(v).cpu().numpy() for k, v in rec.items()}  # (T, N, ...)
-    data.update(start=start.cpu().numpy(), goal=target.cpu().numpy(), dt=u.step_dt)
+    data.update(start=start.cpu().numpy(), goal=target.cpu().numpy(), dt=u.step_dt, max_wheel_speed=mecanum.MAX_WHEEL_SPEED)
     return data
 
 
@@ -150,7 +151,7 @@ def statistics(r: dict) -> dict:
         "wheel_cmd_change_per_step_median": float(np.median(np.abs(dcmd))),
         "wheel_cmd_change_per_step_p90": float(np.percentile(np.abs(dcmd), 90)),
         "wheel_cmd_reversals_per_s": float((np.diff(np.sign(dcmd), axis=0) != 0).mean() / dt),
-        "wheel_cmd_saturated_frac": float((np.abs(r["cmd"]) > 0.95 * mecanum.MAX_WHEEL_SPEED).mean()),
+        "wheel_cmd_saturated_frac": float((np.abs(r["cmd"]) > 0.95 * r["max_wheel_speed"]).mean()),
         "wheel_speed_at_goal_mean_abs": float(np.abs(r["wheel"])[at_goal].mean()) if at_goal.any() else None,
     }
 

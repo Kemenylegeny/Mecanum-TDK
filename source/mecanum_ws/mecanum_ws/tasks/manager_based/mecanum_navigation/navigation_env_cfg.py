@@ -24,7 +24,7 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-from mecanum_ws.robots import mecanum
+from mecanum_ws.robots import mecanum, own_mecanum
 
 from . import mdp
 
@@ -400,6 +400,9 @@ class MecanumNavigationPillarsEnvCfg(ManagerBasedRLEnvCfg):
     """Drive to a goal position among pillars; the policy outputs the four wheel speed setpoints."""
 
     scene: MecanumPillarsSceneCfg = MecanumPillarsSceneCfg(num_envs=4096, env_spacing=TILE_SIZE)
+    robot_name: str = "fuji"
+    """Robot of the task: ``fuji`` (:mod:`mecanum_ws.robots.mecanum`) or ``own`` (:mod:`~mecanum_ws.robots.own_mecanum`);
+    the evaluation tools read it to pick the robot constants."""
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
@@ -480,6 +483,73 @@ class MecanumNavigationFlatEnvCfg(MecanumNavigationPillarsEnvCfg):
 
 @configclass
 class MecanumNavigationFlatEnvCfg_PLAY(MecanumNavigationFlatEnvCfg):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.scene.num_envs = 32
+        self.scene.terrain.terrain_generator.num_rows = 5
+        self.scene.terrain.terrain_generator.num_cols = 5
+        self.observations.policy.enable_corruption = False
+        self.events.physics_material = None
+
+
+##
+# Our own robot
+##
+
+OWN_FLAT_REWARDS = {
+    # weights of the last accepted run of the simulated (FUJI) robot: pillars9s_slipw slip_f0.1 (2026-09-30), 9 s
+    "final_position": 10.0,
+    "exploration_bias": 0.5,
+    "wheel_torque_l2": -0.00312,
+    "action_rate_l2": -18.0,
+    "wheel_slip_l2": -6.944,
+}
+OWN_FLAT_EPISODE_LENGTH_S = 9.0
+
+
+def robot_module(name: str):
+    """Robot constants module of ``robot_name``."""
+    return own_mecanum if name == "own" else mecanum
+
+
+def apply_robot(cfg: MecanumNavigationPillarsEnvCfg, name: str) -> None:
+    """Swap every robot-dependent setting of a navigation task (robot, materials, action / observation scaling,
+    wheel geometry in the slip reward, footprint of the collision check)."""
+    rb = robot_module(name)
+    cfg.robot_name = name
+    cfg.scene.robot = rb.MECANUM_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    cfg.scene.lidar.prim_path = "{ENV_REGEX_NS}/Robot/" + rb.BASE_LINK_NAME
+    cfg.scene.terrain.physics_material = rb.ground_material()
+    cfg.sim.physics_material = rb.ROBOT_MATERIAL
+    cfg.actions.wheel_vel.scale = rb.MAX_WHEEL_SPEED
+    cfg.actions.wheel_vel.clip = {".*": (-rb.MAX_WHEEL_SPEED, rb.MAX_WHEEL_SPEED)}
+    cfg.observations.policy.wheel_vel.scale = 1.0 / rb.MAX_WHEEL_SPEED
+    cfg.rewards.wheel_slip_l2.params.update(
+        wheel_radius=rb.WHEEL_RADIUS,
+        wheel_base_half_length=rb.WHEEL_BASE_HALF_LENGTH,
+        track_half_width=rb.TRACK_HALF_WIDTH,
+        wheel_joint_signs=rb.WHEEL_JOINT_SIGNS,
+    )
+    cfg.rewards.obstacle_proximity.params["half_extents"] = rb.FOOTPRINT_HALF_EXTENTS
+    cfg.terminations.collision.params["half_extents"] = rb.FOOTPRINT_HALF_EXTENTS
+
+
+@configclass
+class MecanumNavigationFlatOwnEnvCfg(MecanumNavigationFlatEnvCfg):
+    """Flat navigation with our own robot and the weights of the last accepted FUJI run (``OWN_FLAT_REWARDS``)."""
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        apply_robot(self, "own")
+        self.episode_length_s = OWN_FLAT_EPISODE_LENGTH_S
+        # the robot is ~0.3 m long: follow camera closer than for the FUJI robot
+        self.viewer.eye = (-1.2, -1.2, 1.0)
+        for term, weight in OWN_FLAT_REWARDS.items():
+            getattr(self.rewards, term).weight = weight
+
+
+@configclass
+class MecanumNavigationFlatOwnEnvCfg_PLAY(MecanumNavigationFlatOwnEnvCfg):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.scene.num_envs = 32

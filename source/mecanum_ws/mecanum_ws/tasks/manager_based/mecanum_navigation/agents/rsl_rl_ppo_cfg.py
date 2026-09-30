@@ -53,3 +53,8 @@ class PPORunnerFlatCfg(PPORunnerCfg):
     # With entropy_coef = 0.005 the action std grew from 0.5 to 4.3 (Loss/entropy 2.9 -> 11.5) in 500 iterations and
     # the sampled wheel commands became random full-speed bang-bang (robots jittering in place during training).
     algorithm = PPORunnerCfg().algorithm.replace(entropy_coef=0.0)
+
+
+@configclass
+class PPORunnerFlatOwnCfg(PPORunnerFlatCfg):
+    experiment_name = "mecanum_navigation_flat_own"
