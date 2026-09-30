@@ -45,7 +45,7 @@ mert a görgős kerék validációja szerint ez alatt a kontaktus-zaj numerikus 
 - **Megfigyelés:** bázis lin/ang sebesség, cél (x, y), hátralévő idő, 72 lidar-távolság, 4 kerékfordulat, előző action.
 - **Action:** a 4 kerék fordulat-alapjele, amit egy nyomatékkorlátos DC-motor modell követ, így a csúszás
   ott jelenik meg, ahol a valóságban: ha a nyomatékigény meghaladja a tapadást.
-- **Reward** — Rudin et al. 2022, [arXiv:2209.12827](https://arxiv.org/abs/2209.12827) alapján. Epizód T = 12 s.
+- **Reward** — Rudin et al. 2022, [arXiv:2209.12827](https://arxiv.org/abs/2209.12827) alapján. Az alábbi tábla a kiinduló (2026-09-26-i, 12 s-os) beállítás; a **jelenlegi** súlyok, az epizódhossz (9 s) és a teljes leírás: [`docs/OSSZEFOGLALO.md`](docs/OSSZEFOGLALO.md).
   | Tag | Képlet | Súly |
   |---|---|---|
   | fő jutalom, (1) | `1/T_r · 1/(1+d²)`, csak az utolsó `T_r` = 2 s-ban | 10 (epizódösszeg ≤ 10) |
