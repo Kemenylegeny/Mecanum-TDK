@@ -152,3 +152,14 @@ seed 1. Mozgás (`motion_diagnostics.py`): forgás a célnál / menet közben, e
 | 2026-09-30 18:26 | [own_flat_goalw40](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/2bhxdcbt) | `Mecanum-Navigation-Flat-Own-v0` | `env.rewards.final_position.weight=40.0` | 3.8% | 0.0% | 3.1% | 5.5 | - | sebesség 0.20 m/s, előre 5%, pörgés a célban 0.00 rad/s | final_position = 40 (sorozat: own_flat_goalw*, 20, 30, 40, 50) |
 | 2026-09-30 19:24 | [own_flat_goalw50](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/d2eqe31r) | `Mecanum-Navigation-Flat-Own-v0` | `env.rewards.final_position.weight=50.0` | 6.0% | 0.2% | 5.5% | 7.5 | - | sebesség 0.26 m/s, előre 2%, pörgés a célban 0.00 rad/s | final_position = 50 (sorozat: own_flat_goalw*, 20, 30, 40, 50) |
 | 2026-10-01 12:27 | [own_flat_goal3m_goalw50](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/1f9g30au) | `Mecanum-Navigation-Flat-Own-v0` | `env.rewards.final_position.weight=50.0` `env.commands.goal_pose.max_distance=3.0` | 21.4% | 0.1% | 19.6% | 6.5 | - | sebesség 0.22 m/s, előre 22%, pörgés a célban 0.00 rad/s | mint own_flat_goalw50 (9 s), de a cél legfeljebb 3 m-re; nulláról |
+
+## Büntetések egyenként, nulláról tanítva, 9 s epizód (study `own_flat3m`)
+
+`scripts/tools/penalty_study.py --study own_flat3m` (`Mecanum-Navigation-Flat-Own-v0`, alap: `env.commands.goal_pose.max_distance=3.0` `env.rewards.final_position.weight=50.0` `env.rewards.wheel_torque_l2.weight=0.0` `env.rewards.action_rate_l2.weight=0.0` `env.rewards.wheel_slip_l2.weight=0.0`): minden policy nulláról, 400 iteráció, 3072 env.
+Súly: `w = −f · 50 / (m_ref · 9 s)`, ahol `m_ref` a büntetett mennyiség lépésenkénti
+átlaga az előző elfogadott policynél (így a büntetés a fő jutalom `f`-szeresét vonná le). Elfogadás: a siker / ütközés /
+odaérés nem romlik, és a célzott metrika legalább 20%-kal csökken.
+
+| Dátum | Run (wandb) | Lépés / próba | Új büntetés, súly (f) | Siker | Ütközés | Odaérés [s] | Célzott metrika: ref → új | Döntés |
+|---|---|---|---|---|---|---|---|---|
+| 2026-10-01 13:28 | [stage0_base](https://wandb.ai/varadipeter05-budapesti-m-szaki-s-gazdas-gtudom-nyi-egyetem/mecanum-navigation/runs/grydzy4r) | 0 / 0 | – (csak pozitív jutalom) | 99.5% | 0.5% | 4.2 | – | accepted (gate) |
