@@ -26,16 +26,23 @@ class GoalPositionCommand(TerrainBasedPose2dCommand):
 
     def _resample_command(self, env_ids):
         super()._resample_command(env_ids)
-        if self.cfg.min_distance <= 0.0:
+        if self.cfg.min_distance <= 0.0 and self.cfg.max_distance <= 0.0:
             return
-        # redraw goals closer than min_distance to the (already reset) robot; give up after a few tries
+        # redraw goals closer than min_distance / farther than max_distance from the (already reset) robot
         env_ids = torch.as_tensor(env_ids, device=self.device)
+        max_d = self.cfg.max_distance if self.cfg.max_distance > 0.0 else float("inf")
         for _ in range(self.cfg.max_redraws):
             dist = torch.linalg.norm(self.pos_command_w[env_ids, :2] - self.robot.data.root_pos_w[env_ids, :2], dim=1)
-            close = env_ids[dist < self.cfg.min_distance]
-            if close.numel() == 0:
+            bad = env_ids[(dist < self.cfg.min_distance) | (dist > max_d)]
+            if bad.numel() == 0:
                 break
-            super()._resample_command(close)
+            super()._resample_command(bad)
+        if self.cfg.max_distance > 0.0:
+            # still too far after the redraws: pull the goal towards the robot onto max_distance
+            to_goal = self.pos_command_w[env_ids, :2] - self.robot.data.root_pos_w[env_ids, :2]
+            dist = torch.linalg.norm(to_goal, dim=1, keepdim=True)
+            scale = torch.clamp(self.cfg.max_distance / dist.clamp(min=1e-6), max=1.0)
+            self.pos_command_w[env_ids, :2] = self.robot.data.root_pos_w[env_ids, :2] + to_goal * scale
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -83,8 +90,12 @@ class GoalPositionCommandCfg(TerrainBasedPose2dCommandCfg):
     min_distance: float = 0.0
     """Minimum distance between the robot and a newly sampled goal [m] (goals are redrawn); 0 disables it."""
 
-    max_redraws: int = 10
-    """Number of redraws for :attr:`min_distance` before a closer goal is accepted."""
+    max_distance: float = 0.0
+    """Maximum distance between the robot and a newly sampled goal [m] (goals are redrawn, finally pulled in); 0
+    disables it."""
+
+    max_redraws: int = 20
+    """Number of redraws for :attr:`min_distance` / :attr:`max_distance` before a goal is accepted."""
 
     highlight_env_index: int = -1
     """Env whose goal and arrow are highlighted (e.g. the one the viewer camera follows); -1 for none."""
