@@ -61,6 +61,12 @@ STAGES = [
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--study", required=True, help="Name of the study (folder under logs/penalty_study).")
+    parser.add_argument("--task", default=TASK, help="Navigation task (default: the FUJI robot on flat ground).")
+    parser.add_argument("--experiment", default=os.path.basename(EXPERIMENT_DIR), help="RSL-RL experiment folder of --task.")
+    parser.add_argument("--base", nargs="*", default=[],
+                        help="key=value Hydra overrides of every training (env.* ones also for the evaluation).")
+    parser.add_argument("--terms", nargs="*", default=None, help="Penalties to add, in this order (default: STAGES).")
+    parser.add_argument("--floor", nargs="*", default=[], help="metric=value: robot-specific floors (see STAGES).")
     parser.add_argument("--iterations", type=int, default=400, help="PPO iterations per training (from scratch).")
     parser.add_argument("--num_envs", type=int, default=3072)
     parser.add_argument("--eval_envs", type=int, default=1024)
@@ -82,7 +88,18 @@ def parse_args():
     # used by tune_rewards.summarize / push_to_wandb
     parser.add_argument("--crash_weight", type=float, default=0.5)
     parser.add_argument("--time_weight", type=float, default=0.01)
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.base_overrides = {k: _value(v) for k, _, v in (item.partition("=") for item in args.base)}
+    args.eval_overrides = {k: v for k, v in args.base_overrides.items() if k.startswith("env.")}
+    args.experiment_dir = os.path.join(ROOT, "logs", "rsl_rl", args.experiment)
+    return args
+
+
+def _value(v: str):
+    try:
+        return float(v)
+    except ValueError:
+        return v
 
 
 ##
@@ -95,7 +112,7 @@ def train(args, study_dir: str, name: str, overrides: dict) -> str:
     run_name = f"{args.study}_{name}"
     env = dict(os.environ)
     cmd = [
-        PYTHON, "-u", "scripts/rsl_rl/train.py", "--task", TASK, "--headless",
+        PYTHON, "-u", "scripts/rsl_rl/train.py", "--task", args.task, "--headless",
         "--num_envs", str(args.num_envs), "--max_iterations", str(args.iterations),
         "--seed", str(args.seed), "--run_name", run_name, "agent.save_interval=50",
     ]  # fmt: skip
@@ -109,7 +126,7 @@ def train(args, study_dir: str, name: str, overrides: dict) -> str:
     started = time.time()
 
     def run_dir():
-        dirs = [d for d in glob.glob(os.path.join(EXPERIMENT_DIR, f"*_{run_name}")) if os.path.getmtime(d) >= started - 5]
+        dirs = [d for d in glob.glob(os.path.join(args.experiment_dir, f"*_{run_name}")) if os.path.getmtime(d) >= started - 5]
         return max(dirs, key=os.path.getmtime) if dirs else None
 
     def finished():
@@ -148,7 +165,7 @@ def experiments_row(args, rec: dict):
 
 {header}
 
-`scripts/tools/penalty_study.py --study {args.study}`: minden policy nulláról, {args.iterations} iteráció, {args.num_envs} env.
+`scripts/tools/penalty_study.py --study {args.study}` (`{args.task}`{', alap: ' + ' '.join(f'`{k}={fmt(v)}`' for k, v in args.base_overrides.items()) if args.base_overrides else ''}): minden policy nulláról, {args.iterations} iteráció, {args.num_envs} env.
 Súly: `w = −f · {args.task_max:g} / (m_ref · {args.episode_s:g} s)`, ahol `m_ref` a büntetett mennyiség lépésenkénti
 átlaga az előző elfogadott policynél (így a büntetés a fő jutalom `f`-szeresét vonná le). Elfogadás: a siker / ütközés /
 odaérés nem romlik, és a célzott metrika legalább {args.min_effect:.0%}-kal csökken.
@@ -241,15 +258,20 @@ def main():
         records.append(rec)
         experiments_row(args, rec)
 
-    stages = STAGES[: args.stages]
+    stages = STAGES if args.terms is None else [next(st for st in STAGES if st["term"] == t) for t in args.terms]
+    stages = [dict(st) for st in stages[: args.stages]]
+    floors = {m: float(v) for m, _, v in (item.partition("=") for item in args.floor)}
+    for st in stages:
+        st["floor"] = floors.get(st["metric"], st["floor"])
     log(f"study {args.study}: stage 0 (no penalties) + {len(stages)} penalty stages, {args.iterations} iterations each")
 
     # -- stage 0: positive rewards only
     base = next((r for r in records if r["stage"] == 0 and "error" not in r), None)
     if base is None:
         try:
-            ckpt = train(args, study_dir, "stage0_base", {})
-            base = {"stage": 0, "name": "stage0_base", "checkpoint": ckpt, "overrides": {}, **evaluate(args, study_dir, "stage0_base", ckpt)}
+            ckpt = train(args, study_dir, "stage0_base", dict(args.base_overrides))
+            base = {"stage": 0, "name": "stage0_base", "checkpoint": ckpt, "overrides": dict(args.base_overrides),
+                    **evaluate(args, study_dir, "stage0_base", ckpt)}  # fmt: skip
         except RuntimeError as e:
             records.append({"stage": 0, "name": "stage0_base", "error": str(e)})
             save(f"stopped: {e}")

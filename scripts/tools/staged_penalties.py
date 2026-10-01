@@ -98,9 +98,9 @@ def evaluate(args, study_dir: str, name: str, checkpoint: str) -> dict:
     eval_json = os.path.join(os.path.dirname(checkpoint), f"eval_{os.path.splitext(os.path.basename(checkpoint))[0]}.json")
     if not os.path.exists(eval_json):
         cmd = [
-            PYTHON, "-u", "scripts/rsl_rl/evaluate_navigation.py", "--task", TASK,
+            PYTHON, "-u", "scripts/rsl_rl/evaluate_navigation.py", "--task", getattr(args, "task", TASK),
             "--checkpoint", checkpoint, "--num_envs", str(args.eval_envs),
-        ] + [f"{k}={fmt(v)}" for k, v in EVAL_OVERRIDES.items()]  # fmt: skip
+        ] + [f"{k}={fmt(v)}" for k, v in {**getattr(args, "eval_overrides", {}), **EVAL_OVERRIDES}.items()]  # fmt: skip
         log(f"[{name}] evaluating {os.path.relpath(checkpoint, ROOT)}")
         run(cmd, os.path.join(study_dir, f"{name}_eval.log"), dict(os.environ), done=lambda: os.path.exists(eval_json))
     if not os.path.exists(eval_json):
